@@ -9,4 +9,7 @@
   <Folder Name="/src/">
     <Project Path="src/ManagerAttendance/ManagerAttendance.csproj" DefaultStartup="true" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ManagerAttendance.Tests/ManagerAttendance.Tests.csproj" />
+  </Folder>
 </Solution>
