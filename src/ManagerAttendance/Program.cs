@@ -54,7 +54,7 @@ builder.Services.AddSwaggerGen(c =>
 // 3. Configure DbContext (SQL Server)
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(connectionString ?? "Server=(localdb)\\mssqllocaldb;Database=ManagerAttendanceDb;Trusted_Connection=True;MultipleActiveResultSets=true"));
+    options.UseSqlServer(connectionString ?? "Server=DESKTOP-J51B5LC;Database=ManagementAttendanceSystem;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=true"));
 
 // 4. Configure ASP.NET Core Identity
 builder.Services.AddIdentity<IdentityUser, IdentityRole>(options =>
