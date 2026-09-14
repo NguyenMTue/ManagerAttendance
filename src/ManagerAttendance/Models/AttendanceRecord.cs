@@ -1,3 +1,5 @@
+using ManagerAttendance.Enums;
+
 namespace ManagerAttendance.Models;
 
 public class AttendanceRecord
@@ -7,6 +9,7 @@ public class AttendanceRecord
     public Employee? Employee { get; set; }
     public DateTime ArrivalTime { get; set; }
     public DateTime? DepartureTime { get; set; }
-    public string Status { get; set; } = "Present";
+    public AttendanceStatus Status { get; set; } = AttendanceStatus.Present;
     public string? Notes { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
