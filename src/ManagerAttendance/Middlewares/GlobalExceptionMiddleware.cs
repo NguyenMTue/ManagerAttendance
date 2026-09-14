@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using ManagerAttendance.Common;
 
 namespace ManagerAttendance.Middlewares;
 
@@ -22,7 +23,7 @@ public class GlobalExceptionMiddleware
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An unhandled exception occurred.");
+            _logger.LogError(ex, "An unhandled exception occurred during HTTP request execution.");
             await HandleExceptionAsync(httpContext, ex);
         }
     }
@@ -30,15 +31,29 @@ public class GlobalExceptionMiddleware
     private static Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
         context.Response.ContentType = "application/json";
-        context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
 
-        var response = new
+        var statusCode = exception switch
         {
-            StatusCode = context.Response.StatusCode,
-            Message = "Internal Server Error from the custom middleware.",
-            Detailed = exception.Message
+            ArgumentException or InvalidOperationException => HttpStatusCode.BadRequest,
+            UnauthorizedAccessException => HttpStatusCode.Unauthorized,
+            KeyNotFoundException => HttpStatusCode.NotFound,
+            _ => HttpStatusCode.InternalServerError
         };
 
-        return context.Response.WriteAsync(JsonSerializer.Serialize(response));
+        context.Response.StatusCode = (int)statusCode;
+
+        var response = new ApiResponse<object>
+        {
+            Success = false,
+            Message = exception.Message,
+            Errors = new List<string> { exception.InnerException?.Message ?? exception.Message }
+        };
+
+        var options = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+
+        return context.Response.WriteAsync(JsonSerializer.Serialize(response, options));
     }
 }

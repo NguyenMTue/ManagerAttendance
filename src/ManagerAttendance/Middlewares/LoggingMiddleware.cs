@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace ManagerAttendance.Middlewares;
 
 public class LoggingMiddleware
@@ -13,8 +15,17 @@ public class LoggingMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        _logger.LogInformation("Handling request: {Method} {Path}", context.Request.Method, context.Request.Path);
+        var stopwatch = Stopwatch.StartNew();
+        var request = context.Request;
+
+        _logger.LogInformation("HTTP Request Incoming: {Method} {Path}", request.Method, request.Path);
+
         await _next(context);
-        _logger.LogInformation("Finished handling request.");
+
+        stopwatch.Stop();
+        var response = context.Response;
+
+        _logger.LogInformation("HTTP Response Completed: {Method} {Path} responded {StatusCode} in {ElapsedMs} ms",
+            request.Method, request.Path, response.StatusCode, stopwatch.ElapsedMilliseconds);
     }
 }
