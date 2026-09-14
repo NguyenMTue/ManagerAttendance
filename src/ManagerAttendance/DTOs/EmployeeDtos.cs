@@ -13,13 +13,18 @@ public class EmployeeDto
     public DepartmentType Department { get; set; }
     public BandType Band { get; set; }
     public bool IsActive { get; set; }
+    public DateTime CreatedAt { get; set; }
     public string EmployeeType { get; set; } = string.Empty;
 
-    // Derived specific fields
+    // Developer Specific
     public string? TechnicalDirection { get; set; }
     public string? CodingSkillsFlag { get; set; }
+
+    // QA Specific
     public string? TestingMethodology { get; set; }
     public bool? AutomationSkills { get; set; }
+
+    // Manager Specific
     public ManagerType? ManagerType { get; set; }
     public string? ManagedDepartment { get; set; }
 }
@@ -30,9 +35,9 @@ public class CreateDeveloperDto
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
-    public GenderType Gender { get; set; }
-    public DepartmentType Department { get; set; }
-    public BandType Band { get; set; }
+    public GenderType Gender { get; set; } = GenderType.Male;
+    public DepartmentType Department { get; set; } = DepartmentType.Development;
+    public BandType Band { get; set; } = BandType.Junior;
     public string TechnicalDirection { get; set; } = string.Empty;
     public string CodingSkillsFlag { get; set; } = string.Empty;
 }
@@ -43,9 +48,9 @@ public class CreateQADto
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
-    public GenderType Gender { get; set; }
-    public DepartmentType Department { get; set; }
-    public BandType Band { get; set; }
+    public GenderType Gender { get; set; } = GenderType.Male;
+    public DepartmentType Department { get; set; } = DepartmentType.QA;
+    public BandType Band { get; set; } = BandType.Junior;
     public string TestingMethodology { get; set; } = string.Empty;
     public bool AutomationSkills { get; set; }
 }
@@ -56,10 +61,10 @@ public class CreateManagerDto
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
-    public GenderType Gender { get; set; }
-    public DepartmentType Department { get; set; }
-    public BandType Band { get; set; }
-    public ManagerType ManagerType { get; set; }
+    public GenderType Gender { get; set; } = GenderType.Male;
+    public DepartmentType Department { get; set; } = DepartmentType.Management;
+    public BandType Band { get; set; } = BandType.Senior;
+    public ManagerType ManagerType { get; set; } = ManagerType.Technical;
     public string ManagedDepartment { get; set; } = string.Empty;
 }
 
@@ -70,5 +75,13 @@ public class UpdateEmployeeDto
     public GenderType Gender { get; set; }
     public DepartmentType Department { get; set; }
     public BandType Band { get; set; }
-    public bool IsActive { get; set; }
+    public bool IsActive { get; set; } = true;
+
+    // Derived Specific (Optional)
+    public string? TechnicalDirection { get; set; }
+    public string? CodingSkillsFlag { get; set; }
+    public string? TestingMethodology { get; set; }
+    public bool? AutomationSkills { get; set; }
+    public ManagerType? ManagerType { get; set; }
+    public string? ManagedDepartment { get; set; }
 }
