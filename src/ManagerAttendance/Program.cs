@@ -13,22 +13,27 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Add Controllers & Action Filters
+// 1. Add Controllers & Endpoints
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
 // 2. Configure Swagger with JWT Bearer & Annotations
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiModels.OpenApiInfo { Title = "ManagerAttendance API", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiModels.OpenApiInfo 
+    { 
+        Title = "ManagerAttendance API", 
+        Version = "v1",
+        Description = "Employee Attendance Management System Backend API"
+    });
     c.EnableAnnotations();
     c.AddSecurityDefinition("Bearer", new OpenApiModels.OpenApiSecurityScheme
     {
-        Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
+        Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token in the text input below.\r\n\r\nExample: \"Bearer 12345abcdef\"",
         Name = "Authorization",
         In = OpenApiModels.ParameterLocation.Header,
-        Type = OpenApiModels.SecuritySchemeType.Http,
-        Scheme = "bearer"
+        Type = OpenApiModels.SecuritySchemeType.ApiKey,
+        Scheme = "Bearer"
     });
     c.AddSecurityRequirement(new OpenApiModels.OpenApiSecurityRequirement
     {
@@ -46,15 +51,22 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// 3. Configure DbContext
+// 3. Configure DbContext (SQL Server)
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString ?? "Server=(localdb)\\mssqllocaldb;Database=ManagerAttendanceDb;Trusted_Connection=True;MultipleActiveResultSets=true"));
 
 // 4. Configure ASP.NET Core Identity
-builder.Services.AddIdentity<IdentityUser, IdentityRole>()
-    .AddEntityFrameworkStores<ApplicationDbContext>()
-    .AddDefaultTokenProviders();
+builder.Services.AddIdentity<IdentityUser, IdentityRole>(options =>
+{
+    options.Password.RequireDigit = true;
+    options.Password.RequiredLength = 6;
+    options.Password.RequireNonAlphanumeric = false;
+    options.Password.RequireUppercase = false;
+    options.Password.RequireLowercase = false;
+})
+.AddEntityFrameworkStores<ApplicationDbContext>()
+.AddDefaultTokenProviders();
 
 // 5. Configure JWT Authentication
 var jwtSettingsSection = builder.Configuration.GetSection("JwtSettings");
@@ -94,7 +106,7 @@ builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 
 var app = builder.Build();
 
-// 8. Configure Middlewares Pipeline
+// 8. Configure Middlewares Pipeline Order
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseMiddleware<LoggingMiddleware>();
 
@@ -117,17 +129,25 @@ app.MapControllers();
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
+    var logger = services.GetRequiredService<ILogger<Program>>();
     try
     {
         var context = services.GetRequiredService<ApplicationDbContext>();
         var userManager = services.GetRequiredService<UserManager<IdentityUser>>();
         var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
 
+        if (context.Database.IsSqlServer())
+        {
+            logger.LogInformation("Applying EF Core Database Creation/Migration...");
+            context.Database.EnsureCreated();
+        }
+
+        logger.LogInformation("Seeding default roles, identity users, employees, and attendance data...");
         await DatabaseSeeder.SeedDataAsync(context, userManager, roleManager);
+        logger.LogInformation("Database Seeding completed successfully.");
     }
     catch (Exception ex)
     {
-        var logger = services.GetRequiredService<ILogger<Program>>();
         logger.LogError(ex, "An error occurred while migrating or seeding the database.");
     }
 }
