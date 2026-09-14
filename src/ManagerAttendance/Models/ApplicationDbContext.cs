@@ -21,21 +21,7 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
     {
         base.OnModelCreating(builder);
 
-        // Configure TPH (Table-Per-Hierarchy) for Employee
-        builder.Entity<Employee>()
-            .HasDiscriminator<string>("EmployeeType")
-            .HasValue<Developer>("Developer")
-            .HasValue<QA>("QA")
-            .HasValue<Manager>("Manager");
-
-        builder.Entity<Employee>()
-            .Property(e => e.IsActive)
-            .HasDefaultValue(true);
-
-        builder.Entity<AttendanceRecord>()
-            .HasOne(a => a.Employee)
-            .WithMany(e => e.AttendanceRecords)
-            .HasForeignKey(a => a.EmployeeId)
-            .OnDelete(DeleteBehavior.Cascade);
+        // Apply Fluent API configurations from Configuration directory
+        builder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
     }
 }
