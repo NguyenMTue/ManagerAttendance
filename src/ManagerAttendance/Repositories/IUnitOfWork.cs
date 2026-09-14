@@ -4,5 +4,8 @@ public interface IUnitOfWork : IDisposable
 {
     IEmployeeRepository Employees { get; }
     IAttendanceRepository AttendanceRecords { get; }
-    Task<int> SaveChangesAsync();
+    Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+    Task BeginTransactionAsync(CancellationToken cancellationToken = default);
+    Task CommitTransactionAsync(CancellationToken cancellationToken = default);
+    Task RollbackTransactionAsync(CancellationToken cancellationToken = default);
 }
