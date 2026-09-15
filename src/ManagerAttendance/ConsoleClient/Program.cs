@@ -153,22 +153,10 @@ class Program
     private static async Task CheckInAsync()
     {
         Console.WriteLine("=== CHẤM CÔNG ĐẦU NGÀY (CHECK-IN) ===");
-        int targetEmployeeId;
-
-        if (_employeeId.HasValue)
+        if (string.IsNullOrEmpty(_jwtToken))
         {
-            Console.Write($"Nhập Employee ID [Mặc định từ tài khoản: {_employeeId.Value}]: ");
-            var inputId = Console.ReadLine();
-            targetEmployeeId = string.IsNullOrWhiteSpace(inputId) ? _employeeId.Value : int.Parse(inputId);
-        }
-        else
-        {
-            Console.Write("Nhập Employee ID: ");
-            if (!int.TryParse(Console.ReadLine(), out targetEmployeeId))
-            {
-                ShowError("Employee ID không hợp lệ!");
-                return;
-            }
+            ShowError("Bạn chưa đăng nhập! Vui lòng đăng nhập trước khi chấm công.");
+            return;
         }
 
         Console.Write("Ghi chú [Không bắt buộc]: ");
@@ -176,13 +164,13 @@ class Program
 
         try
         {
-            var checkInDto = new CheckInDto { EmployeeId = targetEmployeeId, Notes = notes };
+            var checkInDto = new CheckInDto { Notes = notes };
             var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/api/attendance/check-in", checkInDto);
 
             if (response.IsSuccessStatusCode)
             {
                 var record = await response.Content.ReadFromJsonAsync<AttendanceRecordDto>();
-                ShowSuccess($"Check-in thành công! ID: {record?.Id} | Thời gian: {record?.ArrivalTime.ToLocalTime()} | Trạng thái: {record?.Status}");
+                ShowSuccess($"Check-in thành công cho bản thân! ID: {record?.Id} | NV: {record?.EmployeeName} | Thời gian: {record?.ArrivalTime.ToLocalTime()} | Trạng thái: {record?.Status}");
             }
             else
             {
@@ -199,22 +187,10 @@ class Program
     private static async Task CheckOutAsync()
     {
         Console.WriteLine("=== KẾT THÚC CA LÀM VIỆC (CHECK-OUT) ===");
-        int targetEmployeeId;
-
-        if (_employeeId.HasValue)
+        if (string.IsNullOrEmpty(_jwtToken))
         {
-            Console.Write($"Nhập Employee ID [Mặc định từ tài khoản: {_employeeId.Value}]: ");
-            var inputId = Console.ReadLine();
-            targetEmployeeId = string.IsNullOrWhiteSpace(inputId) ? _employeeId.Value : int.Parse(inputId);
-        }
-        else
-        {
-            Console.Write("Nhập Employee ID: ");
-            if (!int.TryParse(Console.ReadLine(), out targetEmployeeId))
-            {
-                ShowError("Employee ID không hợp lệ!");
-                return;
-            }
+            ShowError("Bạn chưa đăng nhập! Vui lòng đăng nhập trước khi kết thúc ca làm việc.");
+            return;
         }
 
         Console.Write("Ghi chú ra về [Không bắt buộc]: ");
@@ -222,17 +198,18 @@ class Program
 
         try
         {
-            var checkOutDto = new CheckOutDto { EmployeeId = targetEmployeeId, Notes = notes };
+            var checkOutDto = new CheckOutDto { Notes = notes };
             var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/api/attendance/check-out", checkOutDto);
 
             if (response.IsSuccessStatusCode)
             {
                 var record = await response.Content.ReadFromJsonAsync<AttendanceRecordDto>();
-                ShowSuccess($"Check-out thành công! Thời gian ra: {record?.DepartureTime?.ToLocalTime()} | Ghi chú: {record?.Notes}");
+                ShowSuccess($"Check-out thành công cho bản thân! NV: {record?.EmployeeName} | Thời gian ra: {record?.DepartureTime?.ToLocalTime()} | Ghi chú: {record?.Notes}");
             }
             else
             {
-                ShowError("Check-out thất bại! Không tìm thấy bản ghi Check-in ngày hôm nay.");
+                var errorObj = await response.Content.ReadAsStringAsync();
+                ShowError($"Check-out thất bại! Phản hồi từ Server: {errorObj}");
             }
         }
         catch (Exception ex)

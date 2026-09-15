@@ -17,13 +17,13 @@ public class AttendanceRecordDto
 
 public class CheckInDto
 {
-    public int EmployeeId { get; set; }
+    public int? EmployeeId { get; set; }
     public string? Notes { get; set; }
 }
 
 public class CheckOutDto
 {
-    public int EmployeeId { get; set; }
+    public int? EmployeeId { get; set; }
     public string? Notes { get; set; }
 }
 
