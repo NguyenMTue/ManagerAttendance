@@ -112,6 +112,9 @@ class Program
                         await AdjustEmployeePositionOrStatusAsync();
                         break;
                     case "8":
+                        await ImportEmployeesFromExcelAsync();
+                        break;
+                    case "9":
                         Logout();
                         break;
                     case "0":
@@ -162,7 +165,8 @@ class Program
             Console.WriteLine(" 5. 📊 Xem lịch sử điểm danh nhân viên (Employee Attendance History)");
             Console.WriteLine(" 6. ➕ Tạo nhân viên mới (Create Employee)");
             Console.WriteLine(" 7. ⚙️ Điều chỉnh chức vụ / Trạng thái (Thăng chức / Sa thải)");
-            Console.WriteLine(" 8. 🚪 Đăng xuất (Logout)");
+            Console.WriteLine(" 8. 📁 Nhập danh sách nhân viên từ file Excel (.xlsx) (Bulk Import & Dry-Run)");
+            Console.WriteLine(" 9. 🚪 Đăng xuất (Logout)");
             Console.WriteLine(" 0. ❌ Thoát ứng dụng");
         }
         Console.WriteLine("--------------------------------------------------------------------------");
@@ -592,6 +596,164 @@ class Program
             else
             {
                 ShowError("Lựa chọn không hợp lệ!");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Lỗi kết nối: {ex.Message}");
+        }
+    }
+
+    private static async Task ImportEmployeesFromExcelAsync()
+    {
+        Console.WriteLine("=== NHẬP DANH SÁCH NHÂN VIÊN TỪ FILE EXCEL (.XLSX) ===");
+        if (_userRole != "Admin" && _userRole != "Manager")
+        {
+            ShowError("Chức năng này yêu cầu quyền Admin hoặc Manager!");
+            return;
+        }
+
+        Console.Write("Nhập đường dẫn file Excel [Mặc định: FileExcel/Danh_sach_nhan_vien_VI.xlsx]: ");
+        var filePath = Console.ReadLine()?.Trim();
+        if (string.IsNullOrEmpty(filePath))
+        {
+            filePath = "FileExcel/Danh_sach_nhan_vien_VI.xlsx";
+        }
+
+        if (!File.Exists(filePath))
+        {
+            ShowError($"File không tồn tại tại đường dẫn: {filePath}");
+            return;
+        }
+
+        try
+        {
+            // Step 1: Automatic Dry-Run Validation
+            Console.WriteLine($"\n[BƯỚC 1/2] Đang tự động kiểm tra (Dry-Run) dữ liệu file Excel '{Path.GetFileName(filePath)}'...");
+
+            using var dryRunStream = File.OpenRead(filePath);
+            using var dryRunContent = new MultipartFormDataContent();
+            using var dryRunFileContent = new StreamContent(dryRunStream);
+            dryRunFileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            dryRunContent.Add(dryRunFileContent, "file", Path.GetFileName(filePath));
+
+            string dryRunUrl = $"{_baseUrl}/api/employee/import-excel?dryRun=true";
+            var dryRunResponse = await _httpClient.PostAsync(dryRunUrl, dryRunContent);
+
+            if (!dryRunResponse.IsSuccessStatusCode)
+            {
+                var errStr = await dryRunResponse.Content.ReadAsStringAsync();
+                ShowError($"Lỗi kiểm tra dữ liệu! HTTP Status: {dryRunResponse.StatusCode}. Details: {errStr}");
+                return;
+            }
+
+            var res = await dryRunResponse.Content.ReadFromJsonAsync<ExcelImportResultDto>();
+            if (res == null)
+            {
+                ShowError("Không thể đọc phản hồi kiểm tra từ Server.");
+                return;
+            }
+
+            Console.WriteLine("\n==========================================================================");
+            Console.ForegroundColor = res.ErrorCount > 0 ? ConsoleColor.Yellow : ConsoleColor.Green;
+            Console.WriteLine(" KẾT QUẢ TỰ ĐỘNG KIỂM TRA DỮ LIỆU (DRY-RUN):");
+            Console.ResetColor();
+            Console.WriteLine($" Tổng số dòng: {res.TotalRows} | Hợp lệ: {res.SuccessCount} | Dòng bị lỗi: {res.ErrorCount}");
+            Console.WriteLine("==========================================================================");
+
+            if (res.ImportedEmployees.Any())
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine("\n--- 🟢 BẢNG DANH SÁCH NHÂN VIÊN HỢP LỆ CÓ THỂ THÊM ---");
+                Console.ResetColor();
+                Console.WriteLine($"\n{"STT",-4} | {"Loại NV",-10} | {"Họ và Tên",-22} | {"Email",-28} | {"Phòng ban",-13} | {"Cấp bậc",-10} | {"Thông tin bổ sung",-25}");
+                Console.WriteLine(new string('-', 120));
+
+                int stt = 1;
+                foreach (var emp in res.ImportedEmployees)
+                {
+                    string fullName = $"{emp.FirstName} {emp.LastName}";
+                    string details = emp.EmployeeType switch
+                    {
+                        "Developer" => $"{emp.TechnicalDirection ?? "N/A"} ({emp.CodingSkillsFlag ?? "N/A"})",
+                        "QA" => $"{emp.TestingMethodology ?? "N/A"} (Auto: {(emp.AutomationSkills == true ? "Có" : "Không")})",
+                        "Manager" => $"{emp.ManagerType?.ToString() ?? "N/A"} - Dept: {emp.ManagedDepartment ?? "N/A"}",
+                        _ => "-"
+                    };
+
+                    Console.WriteLine($"{stt++,-4} | {emp.EmployeeType,-10} | {fullName,-22} | {emp.Email,-28} | {emp.Department,-13} | {emp.Band,-10} | {details,-25}");
+                }
+            }
+
+            if (res.Errors.Any())
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("\n--- 🔴 BẢNG THÔNG BÁO CÁC DÒNG LỖI CẦN KIỂM TRA ---");
+                Console.ResetColor();
+                Console.WriteLine($"\n{"Dòng Excel",-10} | {"Cột bị lỗi",-20} | {"Lý do / Mô tả lỗi",-55} | {"Dữ liệu nhập sai",-20}");
+                Console.WriteLine(new string('-', 115));
+
+                foreach (var err in res.Errors)
+                {
+                    string rowStr = err.RowIndex > 0 ? $"Dòng {err.RowIndex}" : "Hệ thống";
+                    string rawStr = string.IsNullOrEmpty(err.RawData) ? "-" : err.RawData;
+                    Console.WriteLine($"{rowStr,-10} | {err.FieldName,-20} | {err.ErrorMessage,-55} | {rawStr,-20}");
+                }
+            }
+
+            if (res.SuccessCount == 0)
+            {
+                ShowError("Không có dòng dữ liệu nào hợp lệ để thêm vào Database!");
+                return;
+            }
+
+            // Step 2: User Decision & Confirmation
+            Console.WriteLine("\n--------------------------------------------------------------------------");
+            if (res.ErrorCount > 0)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.Write($"Phát hiện {res.ErrorCount} dòng lỗi. Bạn có muốn BỎ QUA các dòng lỗi và LƯU {res.SuccessCount} nhân viên hợp lệ vào Database không? (Y/N) [Mặc định N]: ");
+                Console.ResetColor();
+            }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.Write($"Tất cả {res.SuccessCount} dòng đều HỢP LỆ! Bạn có muốn THÊM NAY vào Database không? (Y/N) [Mặc định Y]: ");
+                Console.ResetColor();
+            }
+
+            var confirmInput = Console.ReadLine()?.Trim().ToLower();
+            bool shouldImport = (res.ErrorCount == 0)
+                ? (string.IsNullOrEmpty(confirmInput) || confirmInput == "y" || confirmInput == "yes")
+                : (confirmInput == "y" || confirmInput == "yes");
+
+            if (!shouldImport)
+            {
+                Console.WriteLine("\nĐã HỦY thao tác thêm nhân viên vào Database.");
+                return;
+            }
+
+            // Execute Official Import
+            Console.WriteLine($"\n[BƯỚC 2/2] Đang tiến hành thêm {res.SuccessCount} nhân viên vào Database bất đồng bộ...");
+
+            using var importStream = File.OpenRead(filePath);
+            using var importContent = new MultipartFormDataContent();
+            using var importFileContent = new StreamContent(importStream);
+            importFileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            importContent.Add(importFileContent, "file", Path.GetFileName(filePath));
+
+            string importUrl = $"{_baseUrl}/api/employee/import-excel?dryRun=false";
+            var importResponse = await _httpClient.PostAsync(importUrl, importContent);
+
+            if (importResponse.IsSuccessStatusCode)
+            {
+                var saveRes = await importResponse.Content.ReadFromJsonAsync<ExcelImportResultDto>();
+                ShowSuccess($"Đã thêm thành công {saveRes?.ImportedEmployees?.Count ?? res.SuccessCount} nhân viên vào Cơ sở dữ liệu!");
+            }
+            else
+            {
+                var errStr = await importResponse.Content.ReadAsStringAsync();
+                ShowError($"Thêm thất bại! HTTP Status: {importResponse.StatusCode}. Output: {errStr}");
             }
         }
         catch (Exception ex)

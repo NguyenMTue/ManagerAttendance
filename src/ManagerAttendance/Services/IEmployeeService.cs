@@ -13,4 +13,5 @@ public interface IEmployeeService
     Task<bool> PromoteEmployeeAsync(int id, PromoteEmployeeDto dto);
     Task<bool> UpdateEmployeeStatusAsync(int id, UpdateEmployeeStatusDto dto);
     Task<bool> DeleteEmployeeAsync(int id);
+    Task<ExcelImportResultDto> ImportEmployeesFromExcelAsync(Stream excelStream, bool isDryRun, CancellationToken cancellationToken = default);
 }

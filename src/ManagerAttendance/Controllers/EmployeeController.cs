@@ -192,4 +192,33 @@ public class EmployeeController : ControllerBase
 
         return NoContent();
     }
+
+    /// <summary>
+    /// Bulk Import Employees from Excel file (.xlsx) with Dry-Run mode (Admin & Manager only)
+    /// </summary>
+    [HttpPost("import-excel")]
+    [Authorize(Roles = "Admin,Manager")]
+    [SwaggerOperation(Summary = "Bulk Import Employees from Excel", Description = "Uploads an Excel file (.xlsx) to bulk create employees. Supports dry-run validation mode.")]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(ExcelImportResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ImportExcel(IFormFile file, [FromQuery] bool dryRun = false, CancellationToken cancellationToken = default)
+    {
+        if (file == null || file.Length == 0)
+        {
+            return BadRequest(new { message = "Vui lòng chọn file Excel (.xlsx) để tải lên." });
+        }
+
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (extension != ".xlsx" && extension != ".xls")
+        {
+            return BadRequest(new { message = "Chỉ chấp nhận định dạng file Excel (.xlsx, .xls)." });
+        }
+
+        using var stream = file.OpenReadStream();
+        var result = await _employeeService.ImportEmployeesFromExcelAsync(stream, dryRun, cancellationToken);
+        return Ok(result);
+    }
 }
