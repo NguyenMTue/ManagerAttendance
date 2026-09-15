@@ -11,7 +11,9 @@ public class AttendanceRepository : GenericRepository<AttendanceRecord>, IAttend
 
     public async Task<IEnumerable<AttendanceRecord>> GetAttendanceByEmployeeIdAsync(int employeeId, bool trackChanges = false, CancellationToken cancellationToken = default)
     {
-        var query = _dbSet.Where(a => a.EmployeeId == employeeId).OrderByDescending(a => a.ArrivalTime);
+        var query = _dbSet.Include(a => a.Employee)
+                          .Where(a => a.EmployeeId == employeeId)
+                          .OrderByDescending(a => a.ArrivalTime);
         return trackChanges 
             ? await query.ToListAsync(cancellationToken) 
             : await query.AsNoTracking().ToListAsync(cancellationToken);
@@ -30,7 +32,8 @@ public class AttendanceRepository : GenericRepository<AttendanceRecord>, IAttend
     public async Task<AttendanceRecord?> GetTodayAttendanceByEmployeeIdAsync(int employeeId, bool trackChanges = true, CancellationToken cancellationToken = default)
     {
         var today = DateTime.UtcNow.Date;
-        var query = _dbSet.Where(a => a.EmployeeId == employeeId && a.ArrivalTime.Date == today);
+        var query = _dbSet.Include(a => a.Employee)
+                          .Where(a => a.EmployeeId == employeeId && a.ArrivalTime.Date == today);
         return trackChanges 
             ? await query.FirstOrDefaultAsync(cancellationToken) 
             : await query.AsNoTracking().FirstOrDefaultAsync(cancellationToken);

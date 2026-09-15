@@ -68,7 +68,7 @@ public class AttendanceServiceTests
     }
 
     [Test]
-    public async Task CheckInAsync_WhenAlreadyCheckedInToday_ShouldReturnExistingRecord()
+    public async Task CheckInAsync_WhenAlreadyCheckedInToday_ShouldThrowInvalidOperationException()
     {
         // Arrange
         var employee = new Developer { Id = 1, FirstName = "John", LastName = "Doe" };
@@ -84,18 +84,16 @@ public class AttendanceServiceTests
         _employeeRepoMock.Setup(r => r.GetByIdAsync(1, default))
             .ReturnsAsync(employee);
 
-        _attendanceRepoMock.Setup(r => r.GetTodayAttendanceByEmployeeIdAsync(1, true, default))
+        _attendanceRepoMock.Setup(r => r.GetTodayAttendanceByEmployeeIdAsync(1, It.IsAny<bool>(), default))
             .ReturnsAsync(existingRecord);
 
         var dto = new CheckInDto { EmployeeId = 1 };
 
-        // Act
-        var result = await _attendanceService.CheckInAsync(dto);
-
-        // Assert
-        result.ShouldNotBeNull();
-        result.Id.ShouldBe(100);
-        result.EmployeeId.ShouldBe(1);
+        // Act & Assert
+        await Should.ThrowAsync<InvalidOperationException>(async () =>
+        {
+            await _attendanceService.CheckInAsync(dto);
+        });
 
         _attendanceRepoMock.Verify(r => r.AddAsync(It.IsAny<AttendanceRecord>(), default), Times.Never);
     }
