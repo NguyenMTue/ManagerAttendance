@@ -43,16 +43,22 @@ public class AttendanceService : IAttendanceService
 
     public async Task<AttendanceRecordDto> CheckInAsync(CheckInDto dto)
     {
-        var employee = await _unitOfWork.Employees.GetByIdAsync(dto.EmployeeId);
-        if (employee == null)
+        if (!dto.EmployeeId.HasValue || dto.EmployeeId.Value <= 0)
         {
-            throw new ArgumentException($"Employee with Id {dto.EmployeeId} does not exist.");
+            throw new ArgumentException("Employee ID is required for check-in.");
         }
 
-        var todayRecord = await _unitOfWork.AttendanceRecords.GetTodayAttendanceByEmployeeIdAsync(dto.EmployeeId);
+        var employeeId = dto.EmployeeId.Value;
+        var employee = await _unitOfWork.Employees.GetByIdAsync(employeeId);
+        if (employee == null)
+        {
+            throw new ArgumentException($"Employee with Id {employeeId} does not exist.");
+        }
+
+        var todayRecord = await _unitOfWork.AttendanceRecords.GetTodayAttendanceByEmployeeIdAsync(employeeId);
         if (todayRecord != null)
         {
-            _logger.LogInformation("Employee Id {EmployeeId} has already checked in today.", dto.EmployeeId);
+            _logger.LogInformation("Employee Id {EmployeeId} has already checked in today.", employeeId);
             return _mapper.Map<AttendanceRecordDto>(todayRecord);
         }
 
@@ -63,7 +69,7 @@ public class AttendanceService : IAttendanceService
 
         var record = new AttendanceRecord
         {
-            EmployeeId = dto.EmployeeId,
+            EmployeeId = employeeId,
             ArrivalTime = now,
             Status = status,
             Notes = dto.Notes,
@@ -72,7 +78,7 @@ public class AttendanceService : IAttendanceService
 
         await _unitOfWork.AttendanceRecords.AddAsync(record);
         await _unitOfWork.SaveChangesAsync();
-        _logger.LogInformation("Employee Id {EmployeeId} checked in at {ArrivalTime} with status {Status}.", dto.EmployeeId, now, status);
+        _logger.LogInformation("Employee Id {EmployeeId} checked in at {ArrivalTime} with status {Status}.", employeeId, now, status);
 
         var savedRecord = await _unitOfWork.AttendanceRecords.GetByIdAsync(record.Id);
         return _mapper.Map<AttendanceRecordDto>(savedRecord ?? record);
@@ -80,10 +86,16 @@ public class AttendanceService : IAttendanceService
 
     public async Task<AttendanceRecordDto?> CheckOutAsync(CheckOutDto dto)
     {
-        var todayRecord = await _unitOfWork.AttendanceRecords.GetTodayAttendanceByEmployeeIdAsync(dto.EmployeeId, trackChanges: true);
+        if (!dto.EmployeeId.HasValue || dto.EmployeeId.Value <= 0)
+        {
+            throw new ArgumentException("Employee ID is required for check-out.");
+        }
+
+        var employeeId = dto.EmployeeId.Value;
+        var todayRecord = await _unitOfWork.AttendanceRecords.GetTodayAttendanceByEmployeeIdAsync(employeeId, trackChanges: true);
         if (todayRecord == null)
         {
-            _logger.LogWarning("CheckOut failed: No today's check-in record found for Employee Id {EmployeeId}.", dto.EmployeeId);
+            _logger.LogWarning("CheckOut failed: No today's check-in record found for Employee Id {EmployeeId}.", employeeId);
             return null;
         }
 
@@ -97,7 +109,7 @@ public class AttendanceService : IAttendanceService
 
         _unitOfWork.AttendanceRecords.Update(todayRecord);
         await _unitOfWork.SaveChangesAsync();
-        _logger.LogInformation("Employee Id {EmployeeId} checked out at {DepartureTime}.", dto.EmployeeId, todayRecord.DepartureTime);
+        _logger.LogInformation("Employee Id {EmployeeId} checked out at {DepartureTime}.", employeeId, todayRecord.DepartureTime);
 
         return _mapper.Map<AttendanceRecordDto>(todayRecord);
     }
