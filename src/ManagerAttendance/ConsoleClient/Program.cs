@@ -72,7 +72,7 @@ class Program
                         await CheckOutAsync();
                         break;
                     case "3":
-                        await GetAttendanceHistoryAsync();
+                        await GetMyAttendanceHistoryAsync();
                         break;
                     case "4":
                         Logout();
@@ -97,12 +97,15 @@ class Program
                         await CheckOutAsync();
                         break;
                     case "3":
-                        await GetAllEmployeesAsync();
+                        await GetMyAttendanceHistoryAsync();
                         break;
                     case "4":
-                        await GetAttendanceHistoryAsync();
+                        await GetAllEmployeesAsync();
                         break;
                     case "5":
+                        await GetAttendanceHistoryAsync();
+                        break;
+                    case "6":
                         Logout();
                         break;
                     case "0":
@@ -125,15 +128,18 @@ class Program
                         await CheckOutAsync();
                         break;
                     case "3":
-                        await GetAllEmployeesAsync();
+                        await GetMyAttendanceHistoryAsync();
                         break;
                     case "4":
-                        await GetAttendanceHistoryAsync();
+                        await GetAllEmployeesAsync();
                         break;
                     case "5":
-                        await CreateEmployeeAsync();
+                        await GetAttendanceHistoryAsync();
                         break;
                     case "6":
+                        await CreateEmployeeAsync();
+                        break;
+                    case "7":
                         Logout();
                         break;
                     case "0":
@@ -171,7 +177,7 @@ class Program
         {
             Console.WriteLine(" 1. 🟢 Chấm công vào ca (Check-In)");
             Console.WriteLine(" 2. 🔴 Kết thúc ca làm việc (Check-Out)");
-            Console.WriteLine(" 3. 📅 Xem lịch sử điểm danh của bản thân (Attendance History)");
+            Console.WriteLine(" 3. 📅 Xem lịch sử điểm danh của bản thân (My Attendance History)");
             Console.WriteLine(" 4. 🚪 Đăng xuất (Logout)");
             Console.WriteLine(" 0. ❌ Thoát ứng dụng");
         }
@@ -179,19 +185,21 @@ class Program
         {
             Console.WriteLine(" 1. 🟢 Chấm công vào ca (Check-In)");
             Console.WriteLine(" 2. 🔴 Kết thúc ca làm việc (Check-Out)");
-            Console.WriteLine(" 3. 👥 Xem danh sách nhân viên (Get All Employees)");
-            Console.WriteLine(" 4. 📅 Xem lịch sử điểm danh (Attendance History)");
-            Console.WriteLine(" 5. 🚪 Đăng xuất (Logout)");
+            Console.WriteLine(" 3. 📅 Xem lịch sử điểm danh của bản thân (My Attendance History)");
+            Console.WriteLine(" 4. 👥 Xem danh sách nhân viên (Get All Employees)");
+            Console.WriteLine(" 5. 📊 Xem lịch sử điểm danh nhân viên (Employee Attendance History)");
+            Console.WriteLine(" 6. 🚪 Đăng xuất (Logout)");
             Console.WriteLine(" 0. ❌ Thoát ứng dụng");
         }
         else // Admin or other privileged role
         {
             Console.WriteLine(" 1. 🟢 Chấm công vào ca (Check-In)");
             Console.WriteLine(" 2. 🔴 Kết thúc ca làm việc (Check-Out)");
-            Console.WriteLine(" 3. 👥 Xem danh sách nhân viên (Get All Employees)");
-            Console.WriteLine(" 4. 📅 Xem lịch sử điểm danh (Attendance History)");
-            Console.WriteLine(" 5. ➕ Tạo nhân viên mới (Create Employee - Admin Only)");
-            Console.WriteLine(" 6. 🚪 Đăng xuất (Logout)");
+            Console.WriteLine(" 3. 📅 Xem lịch sử điểm danh của bản thân (My Attendance History)");
+            Console.WriteLine(" 4. 👥 Xem danh sách nhân viên (Get All Employees)");
+            Console.WriteLine(" 5. 📊 Xem lịch sử điểm danh nhân viên (Employee Attendance History)");
+            Console.WriteLine(" 6. ➕ Tạo nhân viên mới (Create Employee - Admin Only)");
+            Console.WriteLine(" 7. 🚪 Đăng xuất (Logout)");
             Console.WriteLine(" 0. ❌ Thoát ứng dụng");
         }
         Console.WriteLine("--------------------------------------------------------------------------");
@@ -348,9 +356,9 @@ class Program
         }
     }
 
-    private static async Task GetAttendanceHistoryAsync()
+    private static async Task GetMyAttendanceHistoryAsync()
     {
-        Console.WriteLine("=== LỊCH SỬ ĐIỂM DANH ===");
+        Console.WriteLine("=== LỊCH SỬ ĐIỂM DANH CỦA BẢN THÂN ===");
         if (string.IsNullOrEmpty(_jwtToken))
         {
             ShowError("Bạn chưa đăng nhập!");
@@ -359,19 +367,54 @@ class Program
 
         try
         {
-            string requestUrl;
-            if (_userRole == "Employee")
+            var response = await _httpClient.GetAsync($"{_baseUrl}/api/attendance/my-history");
+            if (response.IsSuccessStatusCode)
             {
-                requestUrl = $"{_baseUrl}/api/attendance/my-history";
+                var records = await response.Content.ReadFromJsonAsync<List<AttendanceRecordDto>>();
+                if (records != null && records.Any())
+                {
+                    Console.WriteLine($"\n{"Tên nhân viên",-22} | {"Thời gian vào (CheckIn)",-24} | {"Thời gian ra (CheckOut)",-24} | {"Trạng thái",-12} | {"Ghi chú",-20}");
+                    Console.WriteLine(new string('-', 110));
+                    foreach (var rec in records)
+                    {
+                        var arrStr = rec.ArrivalTime.ToLocalTime().ToString("dd/MM/yyyy HH:mm");
+                        var depStr = rec.DepartureTime.HasValue ? rec.DepartureTime.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm") : "Chưa Check-out";
+                        Console.WriteLine($"{rec.EmployeeName,-22} | {arrStr,-24} | {depStr,-24} | {rec.Status,-12} | {rec.Notes ?? "",-20}");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("Không tìm thấy dữ liệu điểm danh của bản thân.");
+                }
             }
             else
             {
-                Console.Write("Nhập Employee ID để xem lịch sử [Hoặc bấm Enter để xem tất cả]: ");
-                var inputId = Console.ReadLine()?.Trim();
-                requestUrl = string.IsNullOrWhiteSpace(inputId) 
-                    ? $"{_baseUrl}/api/attendance" 
-                    : $"{_baseUrl}/api/attendance/employee/{inputId}";
+                var errorObj = await response.Content.ReadAsStringAsync();
+                ShowError($"Lấy dữ liệu điểm danh thất bại (HTTP {response.StatusCode}): {errorObj}");
             }
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Lỗi kết nối: {ex.Message}");
+        }
+    }
+
+    private static async Task GetAttendanceHistoryAsync()
+    {
+        Console.WriteLine("=== LỊCH SỬ ĐIỂM DANH NHÂN VIÊN ===");
+        if (string.IsNullOrEmpty(_jwtToken))
+        {
+            ShowError("Bạn chưa đăng nhập!");
+            return;
+        }
+
+        try
+        {
+            Console.Write("Nhập Employee ID để xem lịch sử [Hoặc bấm Enter để xem tất cả]: ");
+            var inputId = Console.ReadLine()?.Trim();
+            string requestUrl = string.IsNullOrWhiteSpace(inputId) 
+                ? $"{_baseUrl}/api/attendance" 
+                : $"{_baseUrl}/api/attendance/employee/{inputId}";
 
             var response = await _httpClient.GetAsync(requestUrl);
             if (response.IsSuccessStatusCode)
@@ -379,13 +422,13 @@ class Program
                 var records = await response.Content.ReadFromJsonAsync<List<AttendanceRecordDto>>();
                 if (records != null && records.Any())
                 {
-                    Console.WriteLine($"\n{"ID",-5} | {"Tên nhân viên",-20} | {"Thời gian vào (CheckIn)",-22} | {"Thời gian ra (CheckOut)",-22} | {"Trạng thái",-10}");
-                    Console.WriteLine(new string('-', 85));
+                    Console.WriteLine($"\n{"Tên nhân viên",-22} | {"Thời gian vào (CheckIn)",-24} | {"Thời gian ra (CheckOut)",-24} | {"Trạng thái",-12} | {"Ghi chú",-20}");
+                    Console.WriteLine(new string('-', 110));
                     foreach (var rec in records)
                     {
                         var arrStr = rec.ArrivalTime.ToLocalTime().ToString("dd/MM/yyyy HH:mm");
                         var depStr = rec.DepartureTime.HasValue ? rec.DepartureTime.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm") : "Chưa Check-out";
-                        Console.WriteLine($"{rec.Id,-5} | {rec.EmployeeName,-20} | {arrStr,-22} | {depStr,-22} | {rec.Status,-10}");
+                        Console.WriteLine($"{rec.EmployeeName,-22} | {arrStr,-24} | {depStr,-24} | {rec.Status,-12} | {rec.Notes ?? "",-20}");
                     }
                 }
                 else

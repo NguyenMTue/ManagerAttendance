@@ -58,8 +58,9 @@ public class AttendanceService : IAttendanceService
         var todayRecord = await _unitOfWork.AttendanceRecords.GetTodayAttendanceByEmployeeIdAsync(employeeId);
         if (todayRecord != null)
         {
-            _logger.LogInformation("Employee Id {EmployeeId} has already checked in today.", employeeId);
-            return _mapper.Map<AttendanceRecordDto>(todayRecord);
+            _logger.LogWarning("Employee Id {EmployeeId} has already checked in today.", employeeId);
+            var checkInTime = todayRecord.ArrivalTime.ToLocalTime().ToString("HH:mm:ss dd/MM/yyyy");
+            throw new InvalidOperationException($"Tài khoản của bạn đã thực hiện điểm danh (Check-In) cho ngày hôm nay rồi (Vào lúc {checkInTime}).");
         }
 
         var now = DateTime.UtcNow;
