@@ -41,42 +41,109 @@ class Program
         while (!exit)
         {
             RenderMenu();
-            Console.Write("\nChọn chức năng [0-7]: ");
+            Console.Write("\nChọn chức năng: ");
             var choice = Console.ReadLine()?.Trim();
 
             Console.WriteLine();
-            switch (choice)
+            if (string.IsNullOrEmpty(_jwtToken))
             {
-                case "1":
-                    await LoginAsync();
-                    break;
-                case "2":
-                    await CheckInAsync();
-                    break;
-                case "3":
-                    await CheckOutAsync();
-                    break;
-                case "4":
-                    await GetAllEmployeesAsync();
-                    break;
-                case "5":
-                    await GetAttendanceHistoryAsync();
-                    break;
-                case "6":
-                    await CreateEmployeeAsync();
-                    break;
-                case "7":
-                    Logout();
-                    break;
-                case "0":
-                    exit = true;
-                    Console.WriteLine("Cảm ơn bạn đã sử dụng hệ thống ManagerAttendance. Tạm biệt!");
-                    break;
-                default:
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine("Lựa chọn không hợp lệ! Vui lòng chọn từ 0 đến 7.");
-                    Console.ResetColor();
-                    break;
+                switch (choice)
+                {
+                    case "1":
+                        await LoginAsync();
+                        break;
+                    case "0":
+                        exit = true;
+                        Console.WriteLine("Cảm ơn bạn đã sử dụng hệ thống ManagerAttendance. Tạm biệt!");
+                        break;
+                    default:
+                        ShowError("Lựa chọn không hợp lệ!");
+                        break;
+                }
+            }
+            else if (_userRole == "Employee")
+            {
+                switch (choice)
+                {
+                    case "1":
+                        await CheckInAsync();
+                        break;
+                    case "2":
+                        await CheckOutAsync();
+                        break;
+                    case "3":
+                        await GetAttendanceHistoryAsync();
+                        break;
+                    case "4":
+                        Logout();
+                        break;
+                    case "0":
+                        exit = true;
+                        Console.WriteLine("Cảm ơn bạn đã sử dụng hệ thống ManagerAttendance. Tạm biệt!");
+                        break;
+                    default:
+                        ShowError("Lựa chọn không hợp lệ!");
+                        break;
+                }
+            }
+            else if (_userRole == "Manager")
+            {
+                switch (choice)
+                {
+                    case "1":
+                        await CheckInAsync();
+                        break;
+                    case "2":
+                        await CheckOutAsync();
+                        break;
+                    case "3":
+                        await GetAllEmployeesAsync();
+                        break;
+                    case "4":
+                        await GetAttendanceHistoryAsync();
+                        break;
+                    case "5":
+                        Logout();
+                        break;
+                    case "0":
+                        exit = true;
+                        Console.WriteLine("Cảm ơn bạn đã sử dụng hệ thống ManagerAttendance. Tạm biệt!");
+                        break;
+                    default:
+                        ShowError("Lựa chọn không hợp lệ!");
+                        break;
+                }
+            }
+            else // Admin
+            {
+                switch (choice)
+                {
+                    case "1":
+                        await CheckInAsync();
+                        break;
+                    case "2":
+                        await CheckOutAsync();
+                        break;
+                    case "3":
+                        await GetAllEmployeesAsync();
+                        break;
+                    case "4":
+                        await GetAttendanceHistoryAsync();
+                        break;
+                    case "5":
+                        await CreateEmployeeAsync();
+                        break;
+                    case "6":
+                        Logout();
+                        break;
+                    case "0":
+                        exit = true;
+                        Console.WriteLine("Cảm ơn bạn đã sử dụng hệ thống ManagerAttendance. Tạm biệt!");
+                        break;
+                    default:
+                        ShowError("Lựa chọn không hợp lệ!");
+                        break;
+                }
             }
 
             if (!exit)
@@ -94,14 +161,39 @@ class Program
         Console.WriteLine($" Trạng thái: {_userEmail} | Role: {_userRole} | EmployeeId: {(_employeeId.HasValue ? _employeeId.Value.ToString() : "N/A")}");
         Console.ResetColor();
         Console.WriteLine("--------------------------------------------------------------------------");
-        Console.WriteLine(" 1. 🔑 Đăng nhập (Login)");
-        Console.WriteLine(" 2. 🟢 Chấm công vào ca (Check-In)");
-        Console.WriteLine(" 3. 🔴 Kết thúc ca làm việc (Check-Out)");
-        Console.WriteLine(" 4. 👥 Xem danh sách nhân viên (Get All Employees)");
-        Console.WriteLine(" 5. 📅 Xem lịch sử điểm danh (Attendance History)");
-        Console.WriteLine(" 6. ➕ Tạo nhân viên mới (Create Employee - Admin Only)");
-        Console.WriteLine(" 7. 🚪 Đăng xuất (Logout)");
-        Console.WriteLine(" 0. ❌ Thoát ứng dụng");
+
+        if (string.IsNullOrEmpty(_jwtToken))
+        {
+            Console.WriteLine(" 1. 🔑 Đăng nhập (Login)");
+            Console.WriteLine(" 0. ❌ Thoát ứng dụng");
+        }
+        else if (_userRole == "Employee")
+        {
+            Console.WriteLine(" 1. 🟢 Chấm công vào ca (Check-In)");
+            Console.WriteLine(" 2. 🔴 Kết thúc ca làm việc (Check-Out)");
+            Console.WriteLine(" 3. 📅 Xem lịch sử điểm danh của bản thân (Attendance History)");
+            Console.WriteLine(" 4. 🚪 Đăng xuất (Logout)");
+            Console.WriteLine(" 0. ❌ Thoát ứng dụng");
+        }
+        else if (_userRole == "Manager")
+        {
+            Console.WriteLine(" 1. 🟢 Chấm công vào ca (Check-In)");
+            Console.WriteLine(" 2. 🔴 Kết thúc ca làm việc (Check-Out)");
+            Console.WriteLine(" 3. 👥 Xem danh sách nhân viên (Get All Employees)");
+            Console.WriteLine(" 4. 📅 Xem lịch sử điểm danh (Attendance History)");
+            Console.WriteLine(" 5. 🚪 Đăng xuất (Logout)");
+            Console.WriteLine(" 0. ❌ Thoát ứng dụng");
+        }
+        else // Admin or other privileged role
+        {
+            Console.WriteLine(" 1. 🟢 Chấm công vào ca (Check-In)");
+            Console.WriteLine(" 2. 🔴 Kết thúc ca làm việc (Check-Out)");
+            Console.WriteLine(" 3. 👥 Xem danh sách nhân viên (Get All Employees)");
+            Console.WriteLine(" 4. 📅 Xem lịch sử điểm danh (Attendance History)");
+            Console.WriteLine(" 5. ➕ Tạo nhân viên mới (Create Employee - Admin Only)");
+            Console.WriteLine(" 6. 🚪 Đăng xuất (Logout)");
+            Console.WriteLine(" 0. ❌ Thoát ứng dụng");
+        }
         Console.WriteLine("--------------------------------------------------------------------------");
     }
 
@@ -258,15 +350,28 @@ class Program
 
     private static async Task GetAttendanceHistoryAsync()
     {
-        Console.WriteLine("=== LỊCH SỬ ĐIỂM DANH NHÂN VIÊN ===");
-        Console.Write("Nhập Employee ID để xem lịch sử [Hoặc bấm Enter để xem tất cả nếu là Manager/Admin]: ");
-        var inputId = Console.ReadLine();
+        Console.WriteLine("=== LỊCH SỬ ĐIỂM DANH ===");
+        if (string.IsNullOrEmpty(_jwtToken))
+        {
+            ShowError("Bạn chưa đăng nhập!");
+            return;
+        }
 
         try
         {
-            string requestUrl = string.IsNullOrWhiteSpace(inputId) 
-                ? $"{_baseUrl}/api/attendance" 
-                : $"{_baseUrl}/api/attendance/employee/{inputId}";
+            string requestUrl;
+            if (_userRole == "Employee")
+            {
+                requestUrl = $"{_baseUrl}/api/attendance/my-history";
+            }
+            else
+            {
+                Console.Write("Nhập Employee ID để xem lịch sử [Hoặc bấm Enter để xem tất cả]: ");
+                var inputId = Console.ReadLine()?.Trim();
+                requestUrl = string.IsNullOrWhiteSpace(inputId) 
+                    ? $"{_baseUrl}/api/attendance" 
+                    : $"{_baseUrl}/api/attendance/employee/{inputId}";
+            }
 
             var response = await _httpClient.GetAsync(requestUrl);
             if (response.IsSuccessStatusCode)
@@ -290,7 +395,8 @@ class Program
             }
             else
             {
-                ShowError($"Lấy dữ liệu điểm danh thất bại (HTTP {response.StatusCode})");
+                var errorObj = await response.Content.ReadAsStringAsync();
+                ShowError($"Lấy dữ liệu điểm danh thất bại (HTTP {response.StatusCode}): {errorObj}");
             }
         }
         catch (Exception ex)
