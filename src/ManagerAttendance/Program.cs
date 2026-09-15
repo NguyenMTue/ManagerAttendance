@@ -110,15 +110,13 @@ var app = builder.Build();
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseMiddleware<LoggingMiddleware>();
 
-if (app.Environment.IsDevelopment())
+// Enable Swagger UI at root URL (http://localhost:5000/)
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "ManagerAttendance API v1");
-        c.RoutePrefix = "swagger";
-    });
-}
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "ManagerAttendance API v1");
+    c.RoutePrefix = string.Empty; // Serve Swagger UI at the root (http://localhost:5000)
+});
 
 app.UseHttpsRedirection();
 app.UseAuthentication();
