@@ -85,3 +85,15 @@ public class UpdateEmployeeDto
     public ManagerType? ManagerType { get; set; }
     public string? ManagedDepartment { get; set; }
 }
+
+public class PromoteEmployeeDto
+{
+    public BandType Band { get; set; }
+    public DepartmentType? Department { get; set; }
+}
+
+public class UpdateEmployeeStatusDto
+{
+    public bool IsActive { get; set; }
+    public string? Reason { get; set; }
+}

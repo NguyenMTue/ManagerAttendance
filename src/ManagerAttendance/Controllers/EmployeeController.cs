@@ -56,10 +56,10 @@ public class EmployeeController : ControllerBase
     }
 
     /// <summary>
-    /// Create Developer Employee (Admin only)
+    /// Create Developer Employee (Admin & Manager only)
     /// </summary>
     [HttpPost("developer")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,Manager")]
     [ValidationFilter]
     [SwaggerOperation(Summary = "Create Developer Employee", Description = "Creates a new Developer employee using TPH inheritance.")]
     [ProducesResponseType(typeof(EmployeeDto), StatusCodes.Status201Created)]
@@ -73,10 +73,10 @@ public class EmployeeController : ControllerBase
     }
 
     /// <summary>
-    /// Create QA Employee (Admin only)
+    /// Create QA Employee (Admin & Manager only)
     /// </summary>
     [HttpPost("qa")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,Manager")]
     [ValidationFilter]
     [SwaggerOperation(Summary = "Create QA Employee", Description = "Creates a new QA employee using TPH inheritance.")]
     [ProducesResponseType(typeof(EmployeeDto), StatusCodes.Status201Created)]
@@ -90,10 +90,10 @@ public class EmployeeController : ControllerBase
     }
 
     /// <summary>
-    /// Create Manager Employee (Admin only)
+    /// Create Manager Employee (Admin & Manager only)
     /// </summary>
     [HttpPost("manager")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,Manager")]
     [ValidationFilter]
     [SwaggerOperation(Summary = "Create Manager Employee", Description = "Creates a new Manager employee using TPH inheritance.")]
     [ProducesResponseType(typeof(EmployeeDto), StatusCodes.Status201Created)]
@@ -120,6 +120,50 @@ public class EmployeeController : ControllerBase
     public async Task<IActionResult> Update(int id, [FromBody] UpdateEmployeeDto dto)
     {
         var success = await _employeeService.UpdateEmployeeAsync(id, dto);
+        if (!success)
+        {
+            return NotFound(new { message = $"Employee with Id {id} not found." });
+        }
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Promote Employee Band & Department (Admin & Manager only)
+    /// </summary>
+    [HttpPut("{id}/promote")]
+    [Authorize(Roles = "Admin,Manager")]
+    [ValidationFilter]
+    [SwaggerOperation(Summary = "Promote Employee", Description = "Promotes employee band level and optional department.")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> Promote(int id, [FromBody] PromoteEmployeeDto dto)
+    {
+        var success = await _employeeService.PromoteEmployeeAsync(id, dto);
+        if (!success)
+        {
+            return NotFound(new { message = $"Employee with Id {id} not found." });
+        }
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Update Employee Active Status (Activate / Deactivate / Terminate) (Admin & Manager only)
+    /// </summary>
+    [HttpPut("{id}/status")]
+    [Authorize(Roles = "Admin,Manager")]
+    [ValidationFilter]
+    [SwaggerOperation(Summary = "Update Employee Active Status", Description = "Updates active status for employee (e.g. Terminated/Resigned).")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateEmployeeStatusDto dto)
+    {
+        var success = await _employeeService.UpdateEmployeeStatusAsync(id, dto);
         if (!success)
         {
             return NotFound(new { message = $"Employee with Id {id} not found." });

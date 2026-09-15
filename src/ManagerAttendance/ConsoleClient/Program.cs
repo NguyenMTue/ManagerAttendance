@@ -86,38 +86,7 @@ class Program
                         break;
                 }
             }
-            else if (_userRole == "Manager")
-            {
-                switch (choice)
-                {
-                    case "1":
-                        await CheckInAsync();
-                        break;
-                    case "2":
-                        await CheckOutAsync();
-                        break;
-                    case "3":
-                        await GetMyAttendanceHistoryAsync();
-                        break;
-                    case "4":
-                        await GetAllEmployeesAsync();
-                        break;
-                    case "5":
-                        await GetAttendanceHistoryAsync();
-                        break;
-                    case "6":
-                        Logout();
-                        break;
-                    case "0":
-                        exit = true;
-                        Console.WriteLine("Cảm ơn bạn đã sử dụng hệ thống ManagerAttendance. Tạm biệt!");
-                        break;
-                    default:
-                        ShowError("Lựa chọn không hợp lệ!");
-                        break;
-                }
-            }
-            else // Admin
+            else if (_userRole == "Manager" || _userRole == "Admin")
             {
                 switch (choice)
                 {
@@ -140,6 +109,9 @@ class Program
                         await CreateEmployeeAsync();
                         break;
                     case "7":
+                        await AdjustEmployeePositionOrStatusAsync();
+                        break;
+                    case "8":
                         Logout();
                         break;
                     case "0":
@@ -181,25 +153,16 @@ class Program
             Console.WriteLine(" 4. 🚪 Đăng xuất (Logout)");
             Console.WriteLine(" 0. ❌ Thoát ứng dụng");
         }
-        else if (_userRole == "Manager")
+        else // Manager or Admin
         {
             Console.WriteLine(" 1. 🟢 Chấm công vào ca (Check-In)");
             Console.WriteLine(" 2. 🔴 Kết thúc ca làm việc (Check-Out)");
             Console.WriteLine(" 3. 📅 Xem lịch sử điểm danh của bản thân (My Attendance History)");
             Console.WriteLine(" 4. 👥 Xem danh sách nhân viên (Get All Employees)");
             Console.WriteLine(" 5. 📊 Xem lịch sử điểm danh nhân viên (Employee Attendance History)");
-            Console.WriteLine(" 6. 🚪 Đăng xuất (Logout)");
-            Console.WriteLine(" 0. ❌ Thoát ứng dụng");
-        }
-        else // Admin or other privileged role
-        {
-            Console.WriteLine(" 1. 🟢 Chấm công vào ca (Check-In)");
-            Console.WriteLine(" 2. 🔴 Kết thúc ca làm việc (Check-Out)");
-            Console.WriteLine(" 3. 📅 Xem lịch sử điểm danh của bản thân (My Attendance History)");
-            Console.WriteLine(" 4. 👥 Xem danh sách nhân viên (Get All Employees)");
-            Console.WriteLine(" 5. 📊 Xem lịch sử điểm danh nhân viên (Employee Attendance History)");
-            Console.WriteLine(" 6. ➕ Tạo nhân viên mới (Create Employee - Admin Only)");
-            Console.WriteLine(" 7. 🚪 Đăng xuất (Logout)");
+            Console.WriteLine(" 6. ➕ Tạo nhân viên mới (Create Employee)");
+            Console.WriteLine(" 7. ⚙️ Điều chỉnh chức vụ / Trạng thái (Thăng chức / Sa thải)");
+            Console.WriteLine(" 8. 🚪 Đăng xuất (Logout)");
             Console.WriteLine(" 0. ❌ Thoát ứng dụng");
         }
         Console.WriteLine("--------------------------------------------------------------------------");
@@ -241,6 +204,18 @@ class Program
             }
             else
             {
+                var errorStr = await response.Content.ReadAsStringAsync();
+                try
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(errorStr);
+                    if (doc.RootElement.TryGetProperty("message", out var msgProp))
+                    {
+                        ShowError($"Đăng nhập thất bại: {msgProp.GetString()}");
+                        return;
+                    }
+                }
+                catch { }
+
                 ShowError("Đăng nhập thất bại! Sai Email hoặc Mật khẩu.");
             }
         }
@@ -450,10 +425,10 @@ class Program
 
     private static async Task CreateEmployeeAsync()
     {
-        Console.WriteLine("=== TẠO MỚI NHÂN VIÊN (ADMIN ONLY) ===");
-        if (_userRole != "Admin")
+        Console.WriteLine("=== TẠO MỚI NHÂN VIÊN ===");
+        if (_userRole != "Admin" && _userRole != "Manager")
         {
-            ShowError("Chức năng này chỉ dành cho Admin!");
+            ShowError("Chức năng này yêu cầu quyền Admin hoặc Manager!");
             return;
         }
 
@@ -464,8 +439,8 @@ class Program
         Console.Write("Lựa chọn: ");
         var typeChoice = Console.ReadLine();
 
-        Console.Write("User ID (Identity User Id): ");
-        var userId = Console.ReadLine() ?? string.Empty;
+        var autoUserId = Guid.NewGuid().ToString();
+
         Console.Write("Họ: ");
         var firstName = Console.ReadLine() ?? string.Empty;
         Console.Write("Tên: ");
@@ -482,7 +457,7 @@ class Program
                 var tech = Console.ReadLine() ?? "Backend";
                 var dto = new CreateDeveloperDto
                 {
-                    UserId = userId,
+                    UserId = autoUserId,
                     FirstName = firstName,
                     LastName = lastName,
                     Email = email,
@@ -497,7 +472,7 @@ class Program
                 var method = Console.ReadLine() ?? "Automation";
                 var dto = new CreateQADto
                 {
-                    UserId = userId,
+                    UserId = autoUserId,
                     FirstName = firstName,
                     LastName = lastName,
                     Email = email,
@@ -510,7 +485,7 @@ class Program
             {
                 var dto = new CreateManagerDto
                 {
-                    UserId = userId,
+                    UserId = autoUserId,
                     FirstName = firstName,
                     LastName = lastName,
                     Email = email,
@@ -528,6 +503,95 @@ class Program
             else
             {
                 ShowError($"Tạo nhân viên thất bại! HTTP Status: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Lỗi kết nối: {ex.Message}");
+        }
+    }
+
+    private static async Task AdjustEmployeePositionOrStatusAsync()
+    {
+        Console.WriteLine("=== ĐIỀU CHỈNH CHỨC VỤ / TRẠNG THÁI NHÂN VIÊN ===");
+        if (_userRole != "Admin" && _userRole != "Manager")
+        {
+            ShowError("Chức năng này yêu cầu quyền Admin hoặc Manager!");
+            return;
+        }
+
+        Console.Write("Nhập ID nhân viên cần điều chỉnh: ");
+        if (!int.TryParse(Console.ReadLine(), out int empId))
+        {
+            ShowError("ID nhân viên không hợp lệ!");
+            return;
+        }
+
+        Console.WriteLine("\nChọn thao tác:");
+        Console.WriteLine("1. Thăng chức / Điều chỉnh Cấp bậc (Promote Band)");
+        Console.WriteLine("2. Sa thải / Vô hiệu hóa tài khoản (Terminate / Set Inactive)");
+        Console.WriteLine("3. Kích hoạt lại tài khoản (Reactivate / Set Active)");
+        Console.Write("Lựa chọn: ");
+        var choice = Console.ReadLine()?.Trim();
+
+        try
+        {
+            if (choice == "1")
+            {
+                Console.WriteLine("\nChọn Cấp bậc mới (Band):");
+                Console.WriteLine("0. Intern | 1. Junior | 2. Mid | 3. Senior | 4. Lead | 5. Principal");
+                Console.Write("Nhập số tương ứng: ");
+                if (!int.TryParse(Console.ReadLine(), out int bandVal) || bandVal < 0 || bandVal > 5)
+                {
+                    ShowError("Cấp bậc không hợp lệ!");
+                    return;
+                }
+
+                var dto = new PromoteEmployeeDto
+                {
+                    Band = (BandType)bandVal
+                };
+
+                var response = await _httpClient.PutAsJsonAsync($"{_baseUrl}/api/employee/{empId}/promote", dto);
+                if (response.IsSuccessStatusCode)
+                {
+                    ShowSuccess($"Đã thăng chức / điều chỉnh cấp bậc cho nhân viên ID {empId} thành {(BandType)bandVal}!");
+                }
+                else
+                {
+                    var err = await response.Content.ReadAsStringAsync();
+                    ShowError($"Thất bại! HTTP Status: {response.StatusCode}. Details: {err}");
+                }
+            }
+            else if (choice == "2" || choice == "3")
+            {
+                bool isActive = (choice == "3");
+                string defaultReason = isActive ? "Kích hoạt lại tài khoản" : "Sa thải / Cho nghỉ việc";
+                Console.Write($"Nhập lý do [{defaultReason}]: ");
+                var reason = Console.ReadLine()?.Trim();
+                if (string.IsNullOrEmpty(reason)) reason = defaultReason;
+
+                var dto = new UpdateEmployeeStatusDto
+                {
+                    IsActive = isActive,
+                    Reason = reason
+                };
+
+                var response = await _httpClient.PutAsJsonAsync($"{_baseUrl}/api/employee/{empId}/status", dto);
+                if (response.IsSuccessStatusCode)
+                {
+                    string statusText = isActive ? "KÍCH HOẠT" : "SA THẢI / VÔ HIỆU HÓA";
+                    ShowSuccess($"Đã {statusText} thành công tài khoản nhân viên ID {empId}!");
+                }
+                else
+                {
+                    var err = await response.Content.ReadAsStringAsync();
+                    ShowError($"Thất bại! HTTP Status: {response.StatusCode}. Details: {err}");
+                }
+            }
+            else
+            {
+                ShowError("Lựa chọn không hợp lệ!");
             }
         }
         catch (Exception ex)
