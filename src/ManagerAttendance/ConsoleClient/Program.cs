@@ -86,38 +86,7 @@ class Program
                         break;
                 }
             }
-            else if (_userRole == "Manager")
-            {
-                switch (choice)
-                {
-                    case "1":
-                        await CheckInAsync();
-                        break;
-                    case "2":
-                        await CheckOutAsync();
-                        break;
-                    case "3":
-                        await GetMyAttendanceHistoryAsync();
-                        break;
-                    case "4":
-                        await GetAllEmployeesAsync();
-                        break;
-                    case "5":
-                        await GetAttendanceHistoryAsync();
-                        break;
-                    case "6":
-                        Logout();
-                        break;
-                    case "0":
-                        exit = true;
-                        Console.WriteLine("Cảm ơn bạn đã sử dụng hệ thống ManagerAttendance. Tạm biệt!");
-                        break;
-                    default:
-                        ShowError("Lựa chọn không hợp lệ!");
-                        break;
-                }
-            }
-            else // Admin
+            else if (_userRole == "Manager" || _userRole == "Admin")
             {
                 switch (choice)
                 {
@@ -140,6 +109,12 @@ class Program
                         await CreateEmployeeAsync();
                         break;
                     case "7":
+                        await AdjustEmployeePositionOrStatusAsync();
+                        break;
+                    case "8":
+                        await ImportEmployeesFromExcelAsync();
+                        break;
+                    case "9":
                         Logout();
                         break;
                     case "0":
@@ -181,25 +156,17 @@ class Program
             Console.WriteLine(" 4. 🚪 Đăng xuất (Logout)");
             Console.WriteLine(" 0. ❌ Thoát ứng dụng");
         }
-        else if (_userRole == "Manager")
+        else // Manager or Admin
         {
             Console.WriteLine(" 1. 🟢 Chấm công vào ca (Check-In)");
             Console.WriteLine(" 2. 🔴 Kết thúc ca làm việc (Check-Out)");
             Console.WriteLine(" 3. 📅 Xem lịch sử điểm danh của bản thân (My Attendance History)");
             Console.WriteLine(" 4. 👥 Xem danh sách nhân viên (Get All Employees)");
             Console.WriteLine(" 5. 📊 Xem lịch sử điểm danh nhân viên (Employee Attendance History)");
-            Console.WriteLine(" 6. 🚪 Đăng xuất (Logout)");
-            Console.WriteLine(" 0. ❌ Thoát ứng dụng");
-        }
-        else // Admin or other privileged role
-        {
-            Console.WriteLine(" 1. 🟢 Chấm công vào ca (Check-In)");
-            Console.WriteLine(" 2. 🔴 Kết thúc ca làm việc (Check-Out)");
-            Console.WriteLine(" 3. 📅 Xem lịch sử điểm danh của bản thân (My Attendance History)");
-            Console.WriteLine(" 4. 👥 Xem danh sách nhân viên (Get All Employees)");
-            Console.WriteLine(" 5. 📊 Xem lịch sử điểm danh nhân viên (Employee Attendance History)");
-            Console.WriteLine(" 6. ➕ Tạo nhân viên mới (Create Employee - Admin Only)");
-            Console.WriteLine(" 7. 🚪 Đăng xuất (Logout)");
+            Console.WriteLine(" 6. ➕ Tạo nhân viên mới (Create Employee)");
+            Console.WriteLine(" 7. ⚙️ Điều chỉnh chức vụ / Trạng thái (Thăng chức / Sa thải)");
+            Console.WriteLine(" 8. 📁 Nhập danh sách nhân viên từ file Excel (.xlsx) (Bulk Import & Dry-Run)");
+            Console.WriteLine(" 9. 🚪 Đăng xuất (Logout)");
             Console.WriteLine(" 0. ❌ Thoát ứng dụng");
         }
         Console.WriteLine("--------------------------------------------------------------------------");
@@ -241,6 +208,18 @@ class Program
             }
             else
             {
+                var errorStr = await response.Content.ReadAsStringAsync();
+                try
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(errorStr);
+                    if (doc.RootElement.TryGetProperty("message", out var msgProp))
+                    {
+                        ShowError($"Đăng nhập thất bại: {msgProp.GetString()}");
+                        return;
+                    }
+                }
+                catch { }
+
                 ShowError("Đăng nhập thất bại! Sai Email hoặc Mật khẩu.");
             }
         }
@@ -450,10 +429,10 @@ class Program
 
     private static async Task CreateEmployeeAsync()
     {
-        Console.WriteLine("=== TẠO MỚI NHÂN VIÊN (ADMIN ONLY) ===");
-        if (_userRole != "Admin")
+        Console.WriteLine("=== TẠO MỚI NHÂN VIÊN ===");
+        if (_userRole != "Admin" && _userRole != "Manager")
         {
-            ShowError("Chức năng này chỉ dành cho Admin!");
+            ShowError("Chức năng này yêu cầu quyền Admin hoặc Manager!");
             return;
         }
 
@@ -464,8 +443,8 @@ class Program
         Console.Write("Lựa chọn: ");
         var typeChoice = Console.ReadLine();
 
-        Console.Write("User ID (Identity User Id): ");
-        var userId = Console.ReadLine() ?? string.Empty;
+        var autoUserId = Guid.NewGuid().ToString();
+
         Console.Write("Họ: ");
         var firstName = Console.ReadLine() ?? string.Empty;
         Console.Write("Tên: ");
@@ -482,7 +461,7 @@ class Program
                 var tech = Console.ReadLine() ?? "Backend";
                 var dto = new CreateDeveloperDto
                 {
-                    UserId = userId,
+                    UserId = autoUserId,
                     FirstName = firstName,
                     LastName = lastName,
                     Email = email,
@@ -497,7 +476,7 @@ class Program
                 var method = Console.ReadLine() ?? "Automation";
                 var dto = new CreateQADto
                 {
-                    UserId = userId,
+                    UserId = autoUserId,
                     FirstName = firstName,
                     LastName = lastName,
                     Email = email,
@@ -510,7 +489,7 @@ class Program
             {
                 var dto = new CreateManagerDto
                 {
-                    UserId = userId,
+                    UserId = autoUserId,
                     FirstName = firstName,
                     LastName = lastName,
                     Email = email,
@@ -528,6 +507,253 @@ class Program
             else
             {
                 ShowError($"Tạo nhân viên thất bại! HTTP Status: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Lỗi kết nối: {ex.Message}");
+        }
+    }
+
+    private static async Task AdjustEmployeePositionOrStatusAsync()
+    {
+        Console.WriteLine("=== ĐIỀU CHỈNH CHỨC VỤ / TRẠNG THÁI NHÂN VIÊN ===");
+        if (_userRole != "Admin" && _userRole != "Manager")
+        {
+            ShowError("Chức năng này yêu cầu quyền Admin hoặc Manager!");
+            return;
+        }
+
+        Console.Write("Nhập ID nhân viên cần điều chỉnh: ");
+        if (!int.TryParse(Console.ReadLine(), out int empId))
+        {
+            ShowError("ID nhân viên không hợp lệ!");
+            return;
+        }
+
+        Console.WriteLine("\nChọn thao tác:");
+        Console.WriteLine("1. Thăng chức / Điều chỉnh Cấp bậc (Promote Band)");
+        Console.WriteLine("2. Sa thải / Vô hiệu hóa tài khoản (Terminate / Set Inactive)");
+        Console.WriteLine("3. Kích hoạt lại tài khoản (Reactivate / Set Active)");
+        Console.Write("Lựa chọn: ");
+        var choice = Console.ReadLine()?.Trim();
+
+        try
+        {
+            if (choice == "1")
+            {
+                Console.WriteLine("\nChọn Cấp bậc mới (Band):");
+                Console.WriteLine("0. Intern | 1. Junior | 2. Mid | 3. Senior | 4. Lead | 5. Principal");
+                Console.Write("Nhập số tương ứng: ");
+                if (!int.TryParse(Console.ReadLine(), out int bandVal) || bandVal < 0 || bandVal > 5)
+                {
+                    ShowError("Cấp bậc không hợp lệ!");
+                    return;
+                }
+
+                var dto = new PromoteEmployeeDto
+                {
+                    Band = (BandType)bandVal
+                };
+
+                var response = await _httpClient.PutAsJsonAsync($"{_baseUrl}/api/employee/{empId}/promote", dto);
+                if (response.IsSuccessStatusCode)
+                {
+                    ShowSuccess($"Đã thăng chức / điều chỉnh cấp bậc cho nhân viên ID {empId} thành {(BandType)bandVal}!");
+                }
+                else
+                {
+                    var err = await response.Content.ReadAsStringAsync();
+                    ShowError($"Thất bại! HTTP Status: {response.StatusCode}. Details: {err}");
+                }
+            }
+            else if (choice == "2" || choice == "3")
+            {
+                bool isActive = (choice == "3");
+                string defaultReason = isActive ? "Kích hoạt lại tài khoản" : "Sa thải / Cho nghỉ việc";
+                Console.Write($"Nhập lý do [{defaultReason}]: ");
+                var reason = Console.ReadLine()?.Trim();
+                if (string.IsNullOrEmpty(reason)) reason = defaultReason;
+
+                var dto = new UpdateEmployeeStatusDto
+                {
+                    IsActive = isActive,
+                    Reason = reason
+                };
+
+                var response = await _httpClient.PutAsJsonAsync($"{_baseUrl}/api/employee/{empId}/status", dto);
+                if (response.IsSuccessStatusCode)
+                {
+                    string statusText = isActive ? "KÍCH HOẠT" : "SA THẢI / VÔ HIỆU HÓA";
+                    ShowSuccess($"Đã {statusText} thành công tài khoản nhân viên ID {empId}!");
+                }
+                else
+                {
+                    var err = await response.Content.ReadAsStringAsync();
+                    ShowError($"Thất bại! HTTP Status: {response.StatusCode}. Details: {err}");
+                }
+            }
+            else
+            {
+                ShowError("Lựa chọn không hợp lệ!");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Lỗi kết nối: {ex.Message}");
+        }
+    }
+
+    private static async Task ImportEmployeesFromExcelAsync()
+    {
+        Console.WriteLine("=== NHẬP DANH SÁCH NHÂN VIÊN TỪ FILE EXCEL (.XLSX) ===");
+        if (_userRole != "Admin" && _userRole != "Manager")
+        {
+            ShowError("Chức năng này yêu cầu quyền Admin hoặc Manager!");
+            return;
+        }
+
+        Console.Write("Nhập đường dẫn file Excel [Mặc định: FileExcel/Danh_sach_nhan_vien_VI.xlsx]: ");
+        var filePath = Console.ReadLine()?.Trim();
+        if (string.IsNullOrEmpty(filePath))
+        {
+            filePath = "FileExcel/Danh_sach_nhan_vien_VI.xlsx";
+        }
+
+        if (!File.Exists(filePath))
+        {
+            ShowError($"File không tồn tại tại đường dẫn: {filePath}");
+            return;
+        }
+
+        try
+        {
+            // Step 1: Automatic Dry-Run Validation
+            Console.WriteLine($"\n[BƯỚC 1/2] Đang tự động kiểm tra (Dry-Run) dữ liệu file Excel '{Path.GetFileName(filePath)}'...");
+
+            using var dryRunStream = File.OpenRead(filePath);
+            using var dryRunContent = new MultipartFormDataContent();
+            using var dryRunFileContent = new StreamContent(dryRunStream);
+            dryRunFileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            dryRunContent.Add(dryRunFileContent, "file", Path.GetFileName(filePath));
+
+            string dryRunUrl = $"{_baseUrl}/api/employee/import-excel?dryRun=true";
+            var dryRunResponse = await _httpClient.PostAsync(dryRunUrl, dryRunContent);
+
+            if (!dryRunResponse.IsSuccessStatusCode)
+            {
+                var errStr = await dryRunResponse.Content.ReadAsStringAsync();
+                ShowError($"Lỗi kiểm tra dữ liệu! HTTP Status: {dryRunResponse.StatusCode}. Details: {errStr}");
+                return;
+            }
+
+            var res = await dryRunResponse.Content.ReadFromJsonAsync<ExcelImportResultDto>();
+            if (res == null)
+            {
+                ShowError("Không thể đọc phản hồi kiểm tra từ Server.");
+                return;
+            }
+
+            Console.WriteLine("\n==========================================================================");
+            Console.ForegroundColor = res.ErrorCount > 0 ? ConsoleColor.Yellow : ConsoleColor.Green;
+            Console.WriteLine(" KẾT QUẢ TỰ ĐỘNG KIỂM TRA DỮ LIỆU (DRY-RUN):");
+            Console.ResetColor();
+            Console.WriteLine($" Tổng số dòng: {res.TotalRows} | Hợp lệ: {res.SuccessCount} | Dòng bị lỗi: {res.ErrorCount}");
+            Console.WriteLine("==========================================================================");
+
+            if (res.ImportedEmployees.Any())
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine("\n--- 🟢 BẢNG DANH SÁCH NHÂN VIÊN HỢP LỆ CÓ THỂ THÊM ---");
+                Console.ResetColor();
+                Console.WriteLine($"\n{"STT",-4} | {"Loại NV",-10} | {"Họ và Tên",-22} | {"Email",-28} | {"Phòng ban",-13} | {"Cấp bậc",-10} | {"Thông tin bổ sung",-25}");
+                Console.WriteLine(new string('-', 120));
+
+                int stt = 1;
+                foreach (var emp in res.ImportedEmployees)
+                {
+                    string fullName = $"{emp.FirstName} {emp.LastName}";
+                    string details = emp.EmployeeType switch
+                    {
+                        "Developer" => $"{emp.TechnicalDirection ?? "N/A"} ({emp.CodingSkillsFlag ?? "N/A"})",
+                        "QA" => $"{emp.TestingMethodology ?? "N/A"} (Auto: {(emp.AutomationSkills == true ? "Có" : "Không")})",
+                        "Manager" => $"{emp.ManagerType?.ToString() ?? "N/A"} - Dept: {emp.ManagedDepartment ?? "N/A"}",
+                        _ => "-"
+                    };
+
+                    Console.WriteLine($"{stt++,-4} | {emp.EmployeeType,-10} | {fullName,-22} | {emp.Email,-28} | {emp.Department,-13} | {emp.Band,-10} | {details,-25}");
+                }
+            }
+
+            if (res.Errors.Any())
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("\n--- 🔴 BẢNG THÔNG BÁO CÁC DÒNG LỖI CẦN KIỂM TRA ---");
+                Console.ResetColor();
+                Console.WriteLine($"\n{"Dòng Excel",-10} | {"Cột bị lỗi",-20} | {"Lý do / Mô tả lỗi",-55} | {"Dữ liệu nhập sai",-20}");
+                Console.WriteLine(new string('-', 115));
+
+                foreach (var err in res.Errors)
+                {
+                    string rowStr = err.RowIndex > 0 ? $"Dòng {err.RowIndex}" : "Hệ thống";
+                    string rawStr = string.IsNullOrEmpty(err.RawData) ? "-" : err.RawData;
+                    Console.WriteLine($"{rowStr,-10} | {err.FieldName,-20} | {err.ErrorMessage,-55} | {rawStr,-20}");
+                }
+            }
+
+            if (res.SuccessCount == 0)
+            {
+                ShowError("Không có dòng dữ liệu nào hợp lệ để thêm vào Database!");
+                return;
+            }
+
+            // Step 2: User Decision & Confirmation
+            Console.WriteLine("\n--------------------------------------------------------------------------");
+            if (res.ErrorCount > 0)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.Write($"Phát hiện {res.ErrorCount} dòng lỗi. Bạn có muốn BỎ QUA các dòng lỗi và LƯU {res.SuccessCount} nhân viên hợp lệ vào Database không? (Y/N) [Mặc định N]: ");
+                Console.ResetColor();
+            }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.Write($"Tất cả {res.SuccessCount} dòng đều HỢP LỆ! Bạn có muốn THÊM NAY vào Database không? (Y/N) [Mặc định Y]: ");
+                Console.ResetColor();
+            }
+
+            var confirmInput = Console.ReadLine()?.Trim().ToLower();
+            bool shouldImport = (res.ErrorCount == 0)
+                ? (string.IsNullOrEmpty(confirmInput) || confirmInput == "y" || confirmInput == "yes")
+                : (confirmInput == "y" || confirmInput == "yes");
+
+            if (!shouldImport)
+            {
+                Console.WriteLine("\nĐã HỦY thao tác thêm nhân viên vào Database.");
+                return;
+            }
+
+            // Execute Official Import
+            Console.WriteLine($"\n[BƯỚC 2/2] Đang tiến hành thêm {res.SuccessCount} nhân viên vào Database bất đồng bộ...");
+
+            using var importStream = File.OpenRead(filePath);
+            using var importContent = new MultipartFormDataContent();
+            using var importFileContent = new StreamContent(importStream);
+            importFileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            importContent.Add(importFileContent, "file", Path.GetFileName(filePath));
+
+            string importUrl = $"{_baseUrl}/api/employee/import-excel?dryRun=false";
+            var importResponse = await _httpClient.PostAsync(importUrl, importContent);
+
+            if (importResponse.IsSuccessStatusCode)
+            {
+                var saveRes = await importResponse.Content.ReadFromJsonAsync<ExcelImportResultDto>();
+                ShowSuccess($"Đã thêm thành công {saveRes?.ImportedEmployees?.Count ?? res.SuccessCount} nhân viên vào Cơ sở dữ liệu!");
+            }
+            else
+            {
+                var errStr = await importResponse.Content.ReadAsStringAsync();
+                ShowError($"Thêm thất bại! HTTP Status: {importResponse.StatusCode}. Output: {errStr}");
             }
         }
         catch (Exception ex)

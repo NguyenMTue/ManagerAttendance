@@ -57,6 +57,12 @@ public class AuthService : IAuthService
             employee = await _unitOfWork.Employees.GetByEmailAsync(user.Email!);
         }
 
+        if (employee != null && !employee.IsActive)
+        {
+            _logger.LogWarning("Login failed: Account for {Email} is inactive or terminated.", loginDto.Email);
+            throw new InvalidOperationException("Tài khoản của bạn đã bị vô hiệu hóa, sa thải hoặc đã nghỉ việc!");
+        }
+
         var tokenHandler = new JwtSecurityTokenHandler();
         var key = Encoding.ASCII.GetBytes(string.IsNullOrEmpty(_jwtSettings.Secret) 
             ? "SuperSecretKeyForManagerAttendanceApp123!" 

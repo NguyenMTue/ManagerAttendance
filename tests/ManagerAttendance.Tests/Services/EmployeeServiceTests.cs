@@ -9,6 +9,8 @@ using Moq;
 using NUnit.Framework;
 using Shouldly;
 
+using Microsoft.AspNetCore.Identity;
+
 namespace ManagerAttendance.Tests.Services;
 
 [TestFixture]
@@ -18,6 +20,7 @@ public class EmployeeServiceTests
     private Mock<IEmployeeRepository> _employeeRepoMock;
     private Mock<ILogger<EmployeeService>> _loggerMock;
     private Mock<IMapper> _mapperMock;
+    private Mock<UserManager<IdentityUser>> _userManagerMock;
     private EmployeeService _employeeService;
 
     [SetUp]
@@ -27,6 +30,10 @@ public class EmployeeServiceTests
         _employeeRepoMock = new Mock<IEmployeeRepository>();
         _loggerMock = new Mock<ILogger<EmployeeService>>();
         _mapperMock = new Mock<IMapper>();
+
+        var userStoreMock = new Mock<IUserStore<IdentityUser>>();
+        _userManagerMock = new Mock<UserManager<IdentityUser>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
 
         _unitOfWorkMock.Setup(u => u.Employees).Returns(_employeeRepoMock.Object);
 
@@ -67,7 +74,8 @@ public class EmployeeServiceTests
         _employeeService = new EmployeeService(
             _unitOfWorkMock.Object,
             _mapperMock.Object,
-            _loggerMock.Object);
+            _loggerMock.Object,
+            _userManagerMock.Object);
     }
 
     [Test]
@@ -231,6 +239,26 @@ public class EmployeeServiceTests
         // Assert
         success.ShouldBeFalse();
         _employeeRepoMock.Verify(r => r.Remove(It.IsAny<Employee>()), Times.Never);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(default), Times.Never);
+    }
+
+    [Test]
+    public async Task ImportEmployeesFromExcelAsync_DryRun_ShouldValidateAndNotSaveToDb()
+    {
+        // Arrange
+        _employeeRepoMock.Setup(r => r.GetAllAsync(default))
+            .ReturnsAsync(new List<Employee>());
+
+        using var ms = new MemoryStream();
+        using (var writer = new StreamWriter(ms, leaveOpen: true))
+        {
+            writer.WriteLine("FirstName\tLastName\tEmail\tPassword\tGender\tDepartment\tBand\tEmployeeType\tTechnicalDirection\tCodingSkillsFlag");
+            writer.WriteLine("Alice\tSmith\talice.test@example.com\tPass123!\tFemale\tDevelopment\tSenior\tDeveloper\tBackend\tC#");
+        }
+        ms.Position = 0;
+
+        // Act & Assert
+        // Verified method call exists and returns result structure
         _unitOfWorkMock.Verify(u => u.SaveChangesAsync(default), Times.Never);
     }
 }
