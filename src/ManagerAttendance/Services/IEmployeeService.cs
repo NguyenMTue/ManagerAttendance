@@ -10,5 +10,8 @@ public interface IEmployeeService
     Task<EmployeeDto> CreateQAAsync(CreateQADto dto);
     Task<EmployeeDto> CreateManagerAsync(CreateManagerDto dto);
     Task<bool> UpdateEmployeeAsync(int id, UpdateEmployeeDto dto);
+    Task<bool> PromoteEmployeeAsync(int id, PromoteEmployeeDto dto);
+    Task<bool> UpdateEmployeeStatusAsync(int id, UpdateEmployeeStatusDto dto);
     Task<bool> DeleteEmployeeAsync(int id);
+    Task<ExcelImportResultDto> ImportEmployeesFromExcelAsync(Stream excelStream, bool isDryRun, CancellationToken cancellationToken = default);
 }

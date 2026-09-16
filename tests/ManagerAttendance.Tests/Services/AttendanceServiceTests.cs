@@ -84,7 +84,7 @@ public class AttendanceServiceTests
         _employeeRepoMock.Setup(r => r.GetByIdAsync(1, default))
             .ReturnsAsync(employee);
 
-        _attendanceRepoMock.Setup(r => r.GetTodayAttendanceByEmployeeIdAsync(1, true, default))
+        _attendanceRepoMock.Setup(r => r.GetTodayAttendanceByEmployeeIdAsync(1, It.IsAny<bool>(), default))
             .ReturnsAsync(existingRecord);
 
         var dto = new CheckInDto { EmployeeId = 1 };

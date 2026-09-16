@@ -12,7 +12,9 @@ public class AttendanceRepository : GenericRepository<AttendanceRecord>, IAttend
 
     public async Task<IEnumerable<AttendanceRecord>> GetAttendanceByEmployeeIdAsync(int employeeId, bool trackChanges = false, CancellationToken cancellationToken = default)
     {
-        var query = _dbSet.Where(a => a.EmployeeId == employeeId).OrderByDescending(a => a.ArrivalTime);
+        var query = _dbSet.Include(a => a.Employee)
+                          .Where(a => a.EmployeeId == employeeId)
+                          .OrderByDescending(a => a.ArrivalTime);
         return trackChanges 
             ? await query.ToListAsync(cancellationToken) 
             : await query.AsNoTracking().ToListAsync(cancellationToken);
