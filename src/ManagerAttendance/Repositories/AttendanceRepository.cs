@@ -1,3 +1,4 @@
+using ManagerAttendance.Common;
 using ManagerAttendance.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -31,9 +32,9 @@ public class AttendanceRepository : GenericRepository<AttendanceRecord>, IAttend
 
     public async Task<AttendanceRecord?> GetTodayAttendanceByEmployeeIdAsync(int employeeId, bool trackChanges = true, CancellationToken cancellationToken = default)
     {
-        var today = DateTime.UtcNow.Date;
-        var query = _dbSet.Include(a => a.Employee)
-                          .Where(a => a.EmployeeId == employeeId && a.ArrivalTime.Date == today);
+        var todayStartUtc = TimeZoneHelper.GetTodayStartUtcInVietnam();
+        var todayEndUtc = todayStartUtc.AddDays(1);
+        var query = _dbSet.Where(a => a.EmployeeId == employeeId && a.ArrivalTime >= todayStartUtc && a.ArrivalTime < todayEndUtc);
         return trackChanges 
             ? await query.FirstOrDefaultAsync(cancellationToken) 
             : await query.AsNoTracking().FirstOrDefaultAsync(cancellationToken);

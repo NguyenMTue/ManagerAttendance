@@ -1,4 +1,5 @@
 using AutoMapper;
+using ManagerAttendance.Common;
 using ManagerAttendance.DTOs;
 using ManagerAttendance.Enums;
 using ManagerAttendance.Models;
@@ -59,12 +60,13 @@ public class AttendanceService : IAttendanceService
         if (todayRecord != null)
         {
             _logger.LogWarning("Employee Id {EmployeeId} has already checked in today.", employeeId);
-            var checkInTime = todayRecord.ArrivalTime.ToLocalTime().ToString("HH:mm:ss dd/MM/yyyy");
+            var checkInTime = TimeZoneHelper.GetVietnamTime(todayRecord.ArrivalTime).ToString("HH:mm:ss dd/MM/yyyy");
             throw new InvalidOperationException($"Tài khoản của bạn đã thực hiện điểm danh (Check-In) cho ngày hôm nay rồi (Vào lúc {checkInTime}).");
         }
 
         var now = DateTime.UtcNow;
-        var status = (now.TimeOfDay > new TimeSpan(9, 0, 0)) 
+        var vnTime = TimeZoneHelper.GetVietnamTime(now);
+        var status = (vnTime.TimeOfDay > new TimeSpan(9, 0, 0)) 
             ? AttendanceStatus.Late 
             : AttendanceStatus.Present;
 
