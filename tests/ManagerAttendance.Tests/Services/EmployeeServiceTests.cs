@@ -261,4 +261,45 @@ public class EmployeeServiceTests
         // Verified method call exists and returns result structure
         _unitOfWorkMock.Verify(u => u.SaveChangesAsync(default), Times.Never);
     }
+
+    [Test]
+    public async Task CreateDeveloperAsync_WithoutUserId_ShouldCreateIdentityUserWithDefaultPassword()
+    {
+        // Arrange
+        var dto = new CreateDeveloperDto
+        {
+            FirstName = "Charlie",
+            LastName = "Dev",
+            Email = "charlie.dev@example.com",
+            Department = DepartmentType.IT,
+            Band = BandType.Junior,
+            TechnicalDirection = "Frontend",
+            CodingSkillsFlag = "React"
+        };
+
+        _userManagerMock.Setup(u => u.FindByEmailAsync("charlie.dev@example.com"))
+            .ReturnsAsync((IdentityUser?)null);
+
+        _userManagerMock.Setup(u => u.CreateAsync(It.IsAny<IdentityUser>(), "Employee123!"))
+            .ReturnsAsync(IdentityResult.Success);
+
+        _userManagerMock.Setup(u => u.AddToRoleAsync(It.IsAny<IdentityUser>(), "Employee"))
+            .ReturnsAsync(IdentityResult.Success);
+
+        _employeeRepoMock.Setup(r => r.AddAsync(It.IsAny<Developer>(), default))
+            .Returns(Task.CompletedTask);
+
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(default))
+            .ReturnsAsync(1);
+
+        // Act
+        var result = await _employeeService.CreateDeveloperAsync(dto);
+
+        // Assert
+        result.ShouldNotBeNull();
+        result.Email.ShouldBe("charlie.dev@example.com");
+
+        _userManagerMock.Verify(u => u.CreateAsync(It.Is<IdentityUser>(user => user.Email == "charlie.dev@example.com"), "Employee123!"), Times.Once);
+        _userManagerMock.Verify(u => u.AddToRoleAsync(It.IsAny<IdentityUser>(), "Employee"), Times.Once);
+    }
 }
