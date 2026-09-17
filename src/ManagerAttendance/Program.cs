@@ -150,11 +150,9 @@ using (var scope = app.Services.CreateScope())
         var userManager = services.GetRequiredService<UserManager<IdentityUser>>();
         var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
 
-        if (context.Database.IsSqlServer())
-        {
-            logger.LogInformation("Applying EF Core Database Creation/Migration...");
-            context.Database.EnsureCreated();
-        }
+        logger.LogInformation("Resetting database (EnsureDeleted & EnsureCreated)...");
+        context.Database.EnsureDeleted();
+        context.Database.EnsureCreated();
 
         logger.LogInformation("Seeding default roles, identity users, employees, and attendance data...");
         await DatabaseSeeder.SeedDataAsync(context, userManager, roleManager);
