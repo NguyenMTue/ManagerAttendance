@@ -278,6 +278,7 @@ public class EmployeeService : IEmployeeService
 
             // 2. Validate Email
             rowValues.TryGetValue("Email", out var email);
+            email = email?.Trim();
             if (string.IsNullOrWhiteSpace(email))
             {
                 rowErrors.Add(new ExcelRowErrorDto { RowIndex = rowIndex, FieldName = "Email", ErrorMessage = "Email không được để trống." });
@@ -305,6 +306,7 @@ public class EmployeeService : IEmployeeService
 
             // 3. Validate Password (Default to Employee123! if empty/missing)
             rowValues.TryGetValue("Password", out var password);
+            password = password?.Trim();
             if (string.IsNullOrWhiteSpace(password))
             {
                 password = "Employee123!";
