@@ -40,11 +40,37 @@ public class EmployeeService : IEmployeeService
         return _mapper.Map<EmployeeDto>(employee);
     }
 
+    private async Task<string> EnsureUserCreatedAsync(string email, string roleName, string defaultPassword = "Employee123!")
+    {
+        var existingUser = await _userManager.FindByEmailAsync(email);
+        if (existingUser != null)
+        {
+            return existingUser.Id;
+        }
+
+        var user = new IdentityUser
+        {
+            UserName = email,
+            Email = email,
+            EmailConfirmed = true
+        };
+
+        var createRes = await _userManager.CreateAsync(user, defaultPassword);
+        if (createRes.Succeeded)
+        {
+            await _userManager.AddToRoleAsync(user, roleName);
+            return user.Id;
+        }
+
+        _logger.LogError("Failed to create IdentityUser for {Email}: {Errors}", email, string.Join(", ", createRes.Errors.Select(e => e.Description)));
+        return Guid.NewGuid().ToString();
+    }
+
     public async Task<EmployeeDto> CreateDeveloperAsync(CreateDeveloperDto dto)
     {
         if (string.IsNullOrWhiteSpace(dto.UserId))
         {
-            dto.UserId = Guid.NewGuid().ToString();
+            dto.UserId = await EnsureUserCreatedAsync(dto.Email, "Employee");
         }
         var developer = _mapper.Map<Developer>(dto);
         await _unitOfWork.Employees.AddAsync(developer);
@@ -57,7 +83,7 @@ public class EmployeeService : IEmployeeService
     {
         if (string.IsNullOrWhiteSpace(dto.UserId))
         {
-            dto.UserId = Guid.NewGuid().ToString();
+            dto.UserId = await EnsureUserCreatedAsync(dto.Email, "Employee");
         }
         var qa = _mapper.Map<QA>(dto);
         await _unitOfWork.Employees.AddAsync(qa);
@@ -70,7 +96,7 @@ public class EmployeeService : IEmployeeService
     {
         if (string.IsNullOrWhiteSpace(dto.UserId))
         {
-            dto.UserId = Guid.NewGuid().ToString();
+            dto.UserId = await EnsureUserCreatedAsync(dto.Email, "Manager");
         }
         var manager = _mapper.Map<Manager>(dto);
         await _unitOfWork.Employees.AddAsync(manager);
@@ -277,11 +303,15 @@ public class EmployeeService : IEmployeeService
                 }
             }
 
-            // 3. Validate Password
+            // 3. Validate Password (Default to Employee123! if empty/missing)
             rowValues.TryGetValue("Password", out var password);
-            if (string.IsNullOrWhiteSpace(password) || password.Length < 6)
+            if (string.IsNullOrWhiteSpace(password))
             {
-                rowErrors.Add(new ExcelRowErrorDto { RowIndex = rowIndex, FieldName = "Password", ErrorMessage = "Mật khẩu phải có ít nhất 6 ký tự.", RawData = password ?? string.Empty });
+                password = "Employee123!";
+            }
+            else if (password.Length < 6)
+            {
+                rowErrors.Add(new ExcelRowErrorDto { RowIndex = rowIndex, FieldName = "Password", ErrorMessage = "Mật khẩu phải có ít nhất 6 ký tự.", RawData = password });
             }
 
             // 4. Validate Gender
@@ -413,30 +443,40 @@ public class EmployeeService : IEmployeeService
         // If not dry-run, save valid entities to Database asynchronously
         foreach (var item in validEntities)
         {
-            var user = new IdentityUser
+            var existingUser = await _userManager.FindByEmailAsync(item.Entity.Email);
+            if (existingUser != null)
             {
-                UserName = item.Entity.Email,
-                Email = item.Entity.Email,
-                EmailConfirmed = true
-            };
-
-            var createRes = await _userManager.CreateAsync(user, item.Password);
-            if (createRes.Succeeded)
-            {
-                await _userManager.AddToRoleAsync(user, item.Role);
-                item.Entity.UserId = user.Id;
+                item.Entity.UserId = existingUser.Id;
                 await _unitOfWork.Employees.AddAsync(item.Entity);
                 result.ImportedEmployees.Add(_mapper.Map<EmployeeDto>(item.Entity));
             }
             else
             {
-                var errStr = string.Join("; ", createRes.Errors.Select(e => e.Description));
-                result.Errors.Add(new ExcelRowErrorDto
+                var user = new IdentityUser
                 {
-                    RowIndex = 0,
-                    FieldName = "IdentityUser",
-                    ErrorMessage = $"Không thể tạo tài khoản cho {item.Entity.Email}: {errStr}"
-                });
+                    UserName = item.Entity.Email,
+                    Email = item.Entity.Email,
+                    EmailConfirmed = true
+                };
+
+                var createRes = await _userManager.CreateAsync(user, item.Password);
+                if (createRes.Succeeded)
+                {
+                    await _userManager.AddToRoleAsync(user, item.Role);
+                    item.Entity.UserId = user.Id;
+                    await _unitOfWork.Employees.AddAsync(item.Entity);
+                    result.ImportedEmployees.Add(_mapper.Map<EmployeeDto>(item.Entity));
+                }
+                else
+                {
+                    var errStr = string.Join("; ", createRes.Errors.Select(e => e.Description));
+                    result.Errors.Add(new ExcelRowErrorDto
+                    {
+                        RowIndex = 0,
+                        FieldName = "IdentityUser",
+                        ErrorMessage = $"Không thể tạo tài khoản cho {item.Entity.Email}: {errStr}"
+                    });
+                }
             }
         }
 
