@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useEmployees } from '@/hooks/useEmployees';
-import { FileSpreadsheet, Upload, CheckCircle2, AlertTriangle, Play, XCircle } from 'lucide-react';
+import { FileSpreadsheet, Upload, CheckCircle2, Play, FileCheck } from 'lucide-react';
 import { ExcelImportResultDto } from '@/types';
 
 export default function ImportExcelPage() {
@@ -11,12 +11,43 @@ export default function ImportExcelPage() {
   const [dryRunResult, setDryRunResult] = useState<ExcelImportResultDto | null>(null);
   const [activeTab, setActiveTab] = useState<'valid' | 'errors'>('valid');
   const [importSuccessMsg, setImportSuccessMsg] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+
+  const processFile = (file: File) => {
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (ext === 'xlsx' || ext === 'xls') {
+      setSelectedFile(file);
+      setDryRunResult(null);
+      setImportSuccessMsg(null);
+    } else {
+      alert('Vui lòng chỉ chọn hoặc kéo thả file Excel (.xlsx, .xls)!');
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
-      setDryRunResult(null);
-      setImportSuccessMsg(null);
+      processFile(e.target.files[0]);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      processFile(e.dataTransfer.files[0]);
     }
   };
 
@@ -64,24 +95,60 @@ export default function ImportExcelPage() {
         </div>
       )}
 
-      {/* File Upload Zone */}
-      <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-xs text-center">
-        <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-          <FileSpreadsheet className="w-8 h-8" />
+      {/* File Upload & Drag-and-Drop Zone */}
+      <div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`p-10 rounded-2xl text-center transition-all cursor-pointer border-2 border-dashed relative ${
+          isDragging
+            ? 'border-blue-500 bg-blue-50/70 scale-[1.01] shadow-lg'
+            : selectedFile
+            ? 'border-emerald-400 bg-emerald-50/30 shadow-xs'
+            : 'border-slate-300 hover:border-blue-400 bg-white shadow-xs'
+        }`}
+      >
+        <div
+          className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 transition-colors ${
+            isDragging
+              ? 'bg-blue-600 text-white animate-bounce'
+              : selectedFile
+              ? 'bg-emerald-100 text-emerald-600'
+              : 'bg-blue-50 text-blue-600'
+          }`}
+        >
+          {selectedFile ? <FileCheck className="w-8 h-8" /> : <FileSpreadsheet className="w-8 h-8" />}
         </div>
-        <h3 className="text-lg font-bold text-slate-900">Chọn hoặc Kéo thả File Excel</h3>
-        <p className="text-sm text-slate-500 mt-1 mb-6">Định dạng chấp nhận: .xlsx, .xls</p>
+
+        <h3 className="text-lg font-bold text-slate-900">
+          {isDragging
+            ? 'Thả file Excel vào đây ngay...'
+            : selectedFile
+            ? `Đã chọn file: ${selectedFile.name}`
+            : 'Kéo & Thả file Excel vào đây hoặc Chọn từ máy'}
+        </h3>
+        <p className="text-sm text-slate-500 mt-1 mb-6">
+          {selectedFile
+            ? `Dung lượng: ${(selectedFile.size / 1024).toFixed(1)} KB (.${selectedFile.name.split('.').pop()})`
+            : 'Định dạng chấp nhận: .xlsx, .xls'}
+        </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <label className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl cursor-pointer transition-colors flex items-center gap-2">
+          <label
+            onClick={(e) => e.stopPropagation()}
+            className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl cursor-pointer transition-colors flex items-center gap-2"
+          >
             <Upload className="w-5 h-5" />
-            <span>{selectedFile ? selectedFile.name : 'Duyệt File trên Máy...'}</span>
+            <span>{selectedFile ? 'Thay Đổi File Khác...' : 'Duyệt File trên Máy...'}</span>
             <input type="file" accept=".xlsx, .xls" onChange={handleFileChange} className="hidden" />
           </label>
 
           {selectedFile && (
             <button
-              onClick={handleDryRun}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDryRun();
+              }}
               disabled={importExcelMutation.isPending}
               className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-md transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
